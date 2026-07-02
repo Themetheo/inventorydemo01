@@ -24,7 +24,8 @@ npm run dev
 ## ใช้ Google Sheets
 
 1. เปลี่ยน `AUTH_MODE=sheets` ใน `apps/api/.env`
-2. ตั้ง `GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL` และ `GOOGLE_PRIVATE_KEY`
+2. ตั้ง `GOOGLE_SHEET_ID` และ `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` ใน `apps/api/.env`
+   (หรือใช้ `GOOGLE_SERVICE_ACCOUNT_EMAIL` และ `GOOGLE_PRIVATE_KEY` สำหรับระบบ deploy)
 3. แชร์ Spreadsheet ให้ service account มีสิทธิ์อ่าน
 4. สร้างชีตชื่อ `Users` โดยแถวแรกเป็นหัวตาราง และคอลัมน์ A-F เป็น:
 

@@ -5,6 +5,7 @@ import {
   createSign,
   timingSafeEqual,
 } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 export interface SheetUser {
   userId: string;
@@ -48,6 +49,11 @@ interface CachedAccessToken {
   expiresAt: number;
 }
 
+interface GoogleServiceAccountCredentials {
+  clientEmail: string;
+  privateKey: string;
+}
+
 type AuthMode = "local" | "sheets";
 
 const SESSION_COOKIE_NAME = "restaurant_session";
@@ -77,6 +83,52 @@ function requireEnvironmentVariable(name: string): string {
   }
 
   return value;
+}
+
+function getGoogleServiceAccountCredentials(): GoogleServiceAccountCredentials {
+  const keyFile = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE?.trim();
+
+  if (keyFile) {
+    let value: unknown;
+
+    try {
+      value = JSON.parse(readFileSync(keyFile, "utf8"));
+    } catch (error) {
+      throw new Error(`Unable to read Google service-account key file: ${keyFile}`, {
+        cause: error,
+      });
+    }
+
+    if (typeof value !== "object" || value === null) {
+      throw new Error("Google service-account key file must contain a JSON object");
+    }
+
+    const credentials = value as Record<string, unknown>;
+
+    if (
+      typeof credentials.client_email !== "string" ||
+      !credentials.client_email.trim() ||
+      typeof credentials.private_key !== "string" ||
+      !credentials.private_key.trim()
+    ) {
+      throw new Error(
+        "Google service-account key file is missing client_email or private_key",
+      );
+    }
+
+    return {
+      clientEmail: credentials.client_email.trim(),
+      privateKey: credentials.private_key,
+    };
+  }
+
+  return {
+    clientEmail: requireEnvironmentVariable("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
+    privateKey: requireEnvironmentVariable("GOOGLE_PRIVATE_KEY").replace(
+      /\\n/g,
+      "\n",
+    ),
+  };
 }
 
 export function base64UrlEncode(input: string | Buffer): string {
@@ -247,12 +299,13 @@ function isGoogleSheetValuesResponse(
 
 function createGoogleServiceAccountAssertion(): string {
   const now = Math.floor(Date.now() / 1_000);
+  const credentials = getGoogleServiceAccountCredentials();
   const headerPart = base64UrlEncode(
     JSON.stringify({ alg: "RS256", typ: "JWT" }),
   );
   const payloadPart = base64UrlEncode(
     JSON.stringify({
-      iss: requireEnvironmentVariable("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
+      iss: credentials.clientEmail,
       scope: GOOGLE_SCOPE,
       aud: GOOGLE_TOKEN_URL,
       iat: now,
@@ -260,16 +313,12 @@ function createGoogleServiceAccountAssertion(): string {
     }),
   );
   const unsignedToken = `${headerPart}.${payloadPart}`;
-  const privateKey = requireEnvironmentVariable("GOOGLE_PRIVATE_KEY").replace(
-    /\\n/g,
-    "\n",
-  );
   const signer = createSign("RSA-SHA256");
 
   signer.update(unsignedToken);
   signer.end();
 
-  return `${unsignedToken}.${base64UrlEncode(signer.sign(privateKey))}`;
+  return `${unsignedToken}.${base64UrlEncode(signer.sign(credentials.privateKey))}`;
 }
 
 async function getGoogleAccessToken(): Promise<string> {

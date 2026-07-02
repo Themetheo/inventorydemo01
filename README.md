@@ -44,6 +44,9 @@ userId | username | password | displayName | role | isActive
 - Dashboard: http://localhost:3000/dashboard
 - API health: http://localhost:4000/health
 
+หน้าเว็บเรียก API ผ่าน same-origin path `/api` ซึ่ง Next.js proxy ไปยัง API
+ภายในที่พอร์ต 4000 จึงใช้งานได้ทั้ง localhost และ Codespaces URL
+
 ## ตรวจสอบก่อน deploy
 
 ```bash

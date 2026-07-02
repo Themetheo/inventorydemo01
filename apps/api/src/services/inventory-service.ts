@@ -27,10 +27,25 @@ export class InventoryService {
   async storeItems(branchId: string) { return (await this.repository.read("Store_Items")).map(mapStoreItem).filter((v) => v.branchId === branchId); }
   async balances(branchId: string) { return (await this.repository.read("Stock_Balances", { fresh: true })).map(mapBalance).filter((v) => v.branchId === branchId); }
 
-  async saveItem(input: Partial<Item> & Pick<Item, "itemName" | "categoryId" | "unit">): Promise<Item> {
-    const existing = input.itemId ? (await this.items()).find((v) => v.itemId === input.itemId) : undefined;
-    const value: Item = { itemId: existing?.itemId ?? createId("I"), itemName: input.itemName.trim(), categoryId: input.categoryId, unit: input.unit.trim(), imageUrl: input.imageUrl?.trim() ?? existing?.imageUrl ?? "", description: input.description?.trim() ?? existing?.description ?? "", isActive: input.isActive ?? existing?.isActive ?? true, createdAt: existing?.createdAt ?? now() };
+  async saveItem(input: Partial<Item>): Promise<Item> {
+    const existing = input.itemId ? (await this.items()).find((value) => value.itemId === input.itemId) : undefined;
+    if (input.itemId && !existing) throw new AppError(404, "ITEM_NOT_FOUND", "ไม่พบไอเทมที่ต้องการแก้ไข");
+    const itemName = input.itemName?.trim() ?? existing?.itemName ?? "";
+    const categoryId = input.categoryId?.trim() ?? existing?.categoryId ?? "";
+    const unit = input.unit?.trim() ?? existing?.unit ?? "";
+    if (!itemName || !categoryId || !unit) throw new AppError(400, "INVALID_ITEM", "กรุณาระบุชื่อ หมวดหมู่ และหน่วยสินค้า");
+    const value: Item = {
+      itemId: existing?.itemId ?? createId("I"),
+      itemName,
+      categoryId,
+      unit,
+      imageUrl: input.imageUrl !== undefined ? input.imageUrl.trim() : existing?.imageUrl ?? "",
+      description: input.description !== undefined ? input.description.trim() : existing?.description ?? "",
+      isActive: input.isActive ?? existing?.isActive ?? true,
+      createdAt: existing?.createdAt ?? now(),
+    };
     await this.repository.upsert("Items", "Item_ID", [itemRecord(value)]);
+    this.repository.invalidate("Items");
     return value;
   }
 

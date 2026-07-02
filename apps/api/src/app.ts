@@ -57,7 +57,7 @@ export async function buildApp(repository: InventoryRepository): Promise<Fastify
   app.get(`${prefix}/categories`, auth, async () => ok(await service.categories()));
   app.get(`${prefix}/items`, auth, async () => ok(await service.items()));
   app.post(`${prefix}/items`, master, async (request) => ok(await service.saveItem(itemSchema.parse(request.body))));
-  app.patch(`${prefix}/items/:itemId`, master, async (request) => { const { itemId } = paramsWith("itemId").parse(request.params) as { itemId: string }; return ok(await service.saveItem({ ...itemSchema.partial().parse(request.body), itemId } as z.infer<typeof itemSchema> & { itemId: string })); });
+  app.patch(`${prefix}/items/:itemId`, master, async (request) => { const { itemId } = paramsWith("itemId").parse(request.params) as { itemId: string }; return ok(await service.saveItem({ ...itemPatchSchema.parse(request.body), itemId })); });
   app.get(`${prefix}/locations`, auth, async (request) => { const branchId = z.object({ branchId: z.string().optional() }).parse(request.query).branchId; if (branchId && request.user.role !== "owner" && branchId !== request.user.branchId) throw new AppError(403, "BRANCH_FORBIDDEN", "ไม่สามารถดูข้อมูลต่างสาขาได้"); return ok(await service.locations(branchId ?? request.user.branchId)); });
   app.post(`${prefix}/locations`, master, async (request) => ok(await service.saveLocation(request.user, locationSchema.parse(request.body))));
   app.patch(`${prefix}/locations/:locationId`, master, async (request) => { const { locationId } = paramsWith("locationId").parse(request.params) as { locationId: string }; return ok(await service.saveLocation(request.user, { ...locationSchema.partial().parse(request.body), locationId } as z.infer<typeof locationSchema> & { locationId: string })); });
@@ -86,7 +86,9 @@ export async function buildApp(repository: InventoryRepository): Promise<Fastify
   return app;
 }
 
-const itemSchema = z.object({ itemName: z.string().trim().min(1), categoryId: z.string().min(1), unit: z.string().trim().min(1), imageUrl: z.string().trim().default(""), description: z.string().trim().default(""), isActive: boolean.default(true) });
+const imageUrlSchema = z.string().trim().refine((value) => !value || ((value.startsWith("/") || /^https:\/\//i.test(value)) && /\.(?:webp|png|jpe?g)(?:[?#].*)?$/i.test(value)), "Image URL ต้องเป็น local path ที่ขึ้นต้นด้วย / หรือ HTTPS URL ของไฟล์ webp, png, jpg, jpeg");
+const itemSchema = z.object({ itemName: z.string().trim().min(1), categoryId: z.string().trim().min(1), unit: z.string().trim().min(1), imageUrl: imageUrlSchema.default(""), description: z.string().trim().default(""), isActive: boolean.default(true) });
+const itemPatchSchema = z.object({ itemName: z.string().trim().min(1).optional(), categoryId: z.string().trim().min(1).optional(), unit: z.string().trim().min(1).optional(), imageUrl: imageUrlSchema.optional(), description: z.string().trim().optional(), isActive: boolean.optional() });
 const locationSchema = z.object({ locationName: z.string().trim().min(1), locationType: z.enum(["WAREHOUSE", "FRIDGE", "KITCHEN", "COUNTER", "STORAGE"]), branchId: z.string().optional(), isActive: boolean.default(true) });
 const storeItemsSchema = z.object({ branchId: z.string().min(1), items: z.array(z.object({ itemId: z.string().min(1), minQty: z.number().min(0), targetQty: z.number().min(0), defaultLocationId: z.string(), allowRequest: boolean, requireDailyCount: boolean, isActive: boolean })) });
 export const requestSchema = z.object({ note: z.string().trim().max(500).optional(), items: z.array(z.object({ itemId: z.string().trim().min(1), requestedQty: z.number().positive(), unit: z.string().trim().min(1), note: z.string().trim().max(500).optional() })).min(1, "กรุณาเลือกสินค้าอย่างน้อยหนึ่งรายการ") });

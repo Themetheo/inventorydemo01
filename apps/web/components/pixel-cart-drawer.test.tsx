@@ -11,6 +11,6 @@ describe("PixelCartDrawer", () => {
     expect(markup).toContain("absolute inset-y-0 right-0 z-10");
     expect(markup).toContain("h-[100dvh] w-full max-w-[480px]");
     expect(markup).toContain("min-h-0 flex-1 overflow-y-auto");
-    expect(markup).toContain("shrink-0 border-t-2");
+    expect(markup).toContain("shrink-0 border-t border-[#ddc7a7]");
   });
 });

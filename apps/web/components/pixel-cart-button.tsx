@@ -2,10 +2,10 @@ import type { MouseEventHandler } from "react";
 
 export function PixelCartButton({ count, hidden = false, onClick }: { count: number; hidden?: boolean; onClick: MouseEventHandler<HTMLButtonElement> }) {
   if (hidden) return null;
-  return <button type="button" onClick={onClick} aria-label="เปิดรถเข็นเบิกของ" className="market-button fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-[45] flex min-h-14 items-center gap-2 border-2 border-black bg-red-600 p-3 font-black text-white shadow-[5px_5px_0_#18130f] transition-[transform,box-shadow,background-color] duration-100 hover:bg-black active:translate-x-1 active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-600 focus-visible:ring-offset-2 sm:gap-3 sm:px-4 lg:bottom-7 lg:right-7">
-    <PixelCartIcon />
+  return <button type="button" onClick={onClick} aria-label="เปิดรถเข็นเบิกของ" className="market-button fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-[45] flex min-h-[64px] items-center gap-2 border-2 border-[#71331f] bg-[#b85d2e] p-3 font-black text-white shadow-[6px_7px_0_#71331f] transition-[transform,box-shadow,background-color] duration-100 hover:-translate-y-1 hover:bg-[#c96934] active:translate-y-[5px] active:shadow-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#bd825b] focus-visible:ring-offset-2 sm:gap-3 sm:px-5 lg:bottom-7 lg:right-7">
+    <span className="grid h-9 w-9 place-items-center bg-[#f4c45a] text-[#684126] shadow-[inset_0_-3px_0_#d8952a]"><PixelCartIcon /></span>
     <span className="hidden sm:inline">รถเข็นเบิก</span>
-    <span className="grid h-7 min-w-7 place-items-center border-2 border-black bg-white px-1 text-xs text-black" aria-label={`${count} รายการ`}>{count}</span>
+    <span className="grid h-8 min-w-7 place-items-center border-2 border-[#71331f] bg-[#fff7e6] px-1 text-sm text-[#5d3a25] shadow-[2px_2px_0_#71331f] sm:min-w-8" aria-label={`${count} รายการ`}>{count}</span>
   </button>;
 }
 

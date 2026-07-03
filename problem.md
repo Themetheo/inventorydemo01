@@ -345,6 +345,26 @@
   build ผ่าน
 - สถานะ: design system foundation และหน้าหลักทั้งหมดถูก migrate แล้ว
 
+## 18. AppShell สั่ง Router navigation ระหว่าง render
+
+- อาการ: React แสดง console error
+  `Cannot update a component (Router) while rendering a different component (AppShell)`
+  เมื่อ auth query error หรือไม่มี session user
+- สาเหตุ: `AppShell` เรียก `router.replace("/login")` โดยตรงภายใน conditional branch
+  ระหว่าง render ทำให้ Next Router dispatch state update ขณะที่ React ยัง render tree อยู่
+- การแก้ไข:
+  - ย้าย redirect ไปทำใน `useEffect` หลัง render commit
+  - effect ทำงานเมื่อ auth query หยุด loading และพบ error หรือไม่มี user data
+  - render branch แสดงสถานะ “กำลังกลับไปหน้าเข้าสู่ระบบ...” โดยไม่มี side effect
+  - `router.replace` ใน mutation success callbacks ยังคงเดิม เพราะ callbacks ทำงานหลัง
+    async operation ไม่ได้ทำงานระหว่าง render
+- สิ่งที่ไม่เปลี่ยน: auth API, query key `me`, retry behavior, logout flow, protected
+  routes และ session state
+- Guardrail: ห้ามเรียก `router.push`, `router.replace`, state setter หรือ mutation
+  โดยตรงจาก component render; ให้ทำจาก event callback, mutation callback หรือ effect
+- ผลตรวจ: Web typecheck ผ่านและ Web tests 23 tests ผ่าน
+- สถานะ: แก้แล้ว
+
 ## สถานะการตรวจสอบล่าสุด
 
 - Service Account อ่าน Spreadsheet ได้

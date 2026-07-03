@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { get, post } from "@/lib/api";
 import type { Role, SessionUser } from "@/lib/types";
 
@@ -23,8 +23,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname(); const router = useRouter(); const client = useQueryClient();
   const user = useQuery({ queryKey: ["me"], queryFn: () => get<SessionUser>("/auth/me"), retry: false });
   const logout = useMutation({ mutationFn: () => post("/auth/logout"), onSuccess: () => { client.clear(); router.replace("/login"); } });
+  useEffect(() => {
+    if (!user.isLoading && (user.isError || !user.data)) router.replace("/login");
+  }, [router, user.data, user.isError, user.isLoading]);
   if (user.isLoading) return <FullState text="กำลังเปิดร้าน..." />;
-  if (user.isError || !user.data) { router.replace("/login"); return <FullState text="กำลังกลับไปหน้าเข้าสู่ระบบ..." />; }
+  if (user.isError || !user.data) return <FullState text="กำลังกลับไปหน้าเข้าสู่ระบบ..." />;
   const visible = menus.filter((menu) => menu.roles.includes(user.data.role));
   return <div className="app-market min-h-screen text-[#3d281b] lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
     <aside className="market-sidebar hidden text-[#fff0ce] lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:overflow-y-auto">

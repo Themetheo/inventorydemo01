@@ -1,0 +1,14 @@
+import type { MouseEventHandler } from "react";
+
+export function PixelCartButton({ count, hidden = false, onClick }: { count: number; hidden?: boolean; onClick: MouseEventHandler<HTMLButtonElement> }) {
+  if (hidden) return null;
+  return <button type="button" onClick={onClick} aria-label="เปิดรถเข็นเบิกของ" className="market-button fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-[45] flex min-h-14 items-center gap-2 border-2 border-black bg-red-600 p-3 font-black text-white shadow-[5px_5px_0_#18130f] transition-[transform,box-shadow,background-color] duration-100 hover:bg-black active:translate-x-1 active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-600 focus-visible:ring-offset-2 sm:gap-3 sm:px-4 lg:bottom-7 lg:right-7">
+    <PixelCartIcon />
+    <span className="hidden sm:inline">รถเข็นเบิก</span>
+    <span className="grid h-7 min-w-7 place-items-center border-2 border-black bg-white px-1 text-xs text-black" aria-label={`${count} รายการ`}>{count}</span>
+  </button>;
+}
+
+export function PixelCartIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor" shapeRendering="crispEdges"><path d="M2 3h4v3h2v9h11v-2H10v-2h10V6H8V4H2zM9 17h3v3H9zm7 0h3v3h-3z"/></svg>;
+}

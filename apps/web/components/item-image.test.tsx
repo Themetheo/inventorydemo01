@@ -7,7 +7,7 @@ describe("ItemImage", () => {
     const markup = renderToStaticMarkup(<ItemImage itemName="หมูแดง" />);
     expect(markup).toContain("data-testid=\"item-placeholder\"");
     expect(markup).toContain("place-items-center");
-    expect(markup).toContain("min-h-20");
+    expect(markup).toContain("min-h-22");
     expect(markup).toContain("p-4");
     expect(markup).toContain("leading-none");
     expect(markup).toContain(">ม<");

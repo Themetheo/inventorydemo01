@@ -1,8 +1,8 @@
 "use client";
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { ItemImage } from "@/components/item-image";
-import type { RequestableItem } from "@/lib/types";
+import { ItemImage } from "./item-image";
+import type { RequestableItem } from "../lib/types";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-600 focus-visible:ring-offset-2";
 
@@ -14,10 +14,10 @@ export function PixelButton({ className = "", children, ...props }: ButtonHTMLAt
   return <button className={`market-button min-h-11 border-2 border-black bg-black px-4 py-2.5 font-black text-white shadow-[4px_4px_0_#d62b20] transition-[transform,box-shadow,background-color] duration-100 hover:bg-red-600 active:translate-x-1 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${className}`} {...props}>{children}</button>;
 }
 
-export function PixelTab({ label, code, active, onClick }: { label: string; code: string; active: boolean; onClick: () => void }) {
-  return <button type="button" aria-pressed={active} onClick={onClick} className={`market-button min-h-16 min-w-[9.5rem] shrink-0 border-2 border-black px-4 py-2.5 text-left shadow-[4px_4px_0_#18130f] transition-[transform,box-shadow,background-color] duration-100 active:translate-x-1 active:translate-y-1 active:shadow-none ${focusRing} ${active ? "bg-red-600 text-white" : "bg-white text-black hover:bg-amber-100"}`}>
+export function PixelTab({ label, code, count, active, onClick }: { label: string; code: string; count: number; active: boolean; onClick: () => void }) {
+  return <button type="button" aria-pressed={active} onClick={onClick} className={`market-button min-h-20 w-[min(72vw,220px)] shrink-0 snap-start border-2 border-black px-4 py-3 text-left shadow-[4px_4px_0_#18130f] transition-[transform,box-shadow,background-color] duration-100 active:translate-x-1 active:translate-y-1 active:shadow-none sm:w-auto sm:min-w-0 ${focusRing} ${active ? "bg-red-600 text-white" : "bg-white text-black hover:bg-amber-100"}`}>
     <span className={`block font-mono text-[10px] font-black tracking-[.18em] ${active ? "text-red-100" : "text-red-600"}`}>{code}</span>
-    <span className="mt-1 block text-sm font-black leading-tight">{label}</span>
+    <span className="mt-1 flex items-end justify-between gap-3"><span className="text-sm font-black leading-tight">{label}</span><span className={`font-mono text-xs font-black ${active ? "text-white" : "text-stone-500"}`}>{count}</span></span>
   </button>;
 }
 
@@ -34,21 +34,19 @@ export function ItemMarketCard({ item, selected, onToggle }: { item: Requestable
     <div className="flex flex-1 flex-col p-3.5 sm:p-4">
       <h3 className="line-clamp-2 text-base font-black leading-snug sm:text-lg">{item.itemName}</h3>
       <p className="mt-1 text-xs font-bold text-stone-500">หน่วยเบิก · {item.unit}</p>
-      <div className="my-3 grid grid-cols-2 border-y-2 border-dashed border-stone-300 py-2 text-xs">
-        <span><b className="block text-[10px] uppercase tracking-wider text-stone-400">MIN</b>{item.storeItem.minQty}</span>
-        <span className="border-l-2 border-dashed border-stone-300 pl-3"><b className="block text-[10px] uppercase tracking-wider text-stone-400">TARGET</b>{item.storeItem.targetQty}</span>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <label className="flex min-w-0 flex-col gap-2 border-2 border-dashed border-black bg-white p-3">
+          <span className="text-[10px] font-bold uppercase leading-none text-neutral-500">MIN</span>
+          <input aria-label={`MIN ${item.itemName}`} className="h-10 w-full min-w-0 bg-transparent px-1 text-base font-bold leading-normal outline-none" value={item.storeItem.minQty} readOnly />
+        </label>
+        <label className="flex min-w-0 flex-col gap-2 border-2 border-dashed border-black bg-white p-3">
+          <span className="text-[10px] font-bold uppercase leading-none text-neutral-500">TARGET</span>
+          <input aria-label={`TARGET ${item.itemName}`} className="h-10 w-full min-w-0 bg-transparent px-1 text-base font-bold leading-normal outline-none" value={item.storeItem.targetQty} readOnly />
+        </label>
       </div>
-      <PixelButton type="button" onClick={onToggle} aria-pressed={selected} className={`mt-auto w-full text-sm sm:text-base ${selected ? "bg-white text-red-700 shadow-[4px_4px_0_#18130f] hover:bg-red-50" : ""}`}>{selected ? "− เอาออกจากกระเป๋า" : "+ ใส่กระเป๋า"}</PixelButton>
+      <PixelButton type="button" onClick={onToggle} aria-pressed={selected} className={`mt-4 min-h-12 w-full text-sm sm:text-base ${selected ? "bg-white text-red-700 shadow-[4px_4px_0_#18130f] hover:bg-red-50" : ""}`}>{selected ? "− เอาออกจากกระเป๋า" : "+ ใส่กระเป๋า"}</PixelButton>
     </div>
   </article>;
-}
-
-export function BackpackFab({ count, onClick }: { count: number; onClick: () => void }) {
-  return <button type="button" onClick={onClick} aria-label={`เปิดกระเป๋าเบิก มี ${count} รายการ`} className={`market-button fixed bottom-[4.75rem] right-3 z-30 flex min-h-14 items-center gap-3 border-2 border-black bg-red-600 px-4 py-3 font-black text-white shadow-[5px_5px_0_#18130f] transition-[transform,box-shadow,background-color] duration-100 hover:bg-black active:translate-x-1 active:translate-y-1 active:shadow-none sm:right-5 lg:bottom-6 lg:right-6 ${focusRing}`}>
-    <BackpackIcon />
-    <span>กระเป๋าเบิก</span>
-    <span className="grid min-h-7 min-w-7 place-items-center border-2 border-white bg-black px-1 text-xs" aria-hidden="true">{count}</span>
-  </button>;
 }
 
 export function StatusChip({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "danger" }) {
@@ -61,10 +59,6 @@ export function EmptyStatePixel({ title, description }: { title: string; descrip
     <p className="text-lg font-black">{title}</p>
     <p className="mt-1 text-sm text-stone-500">{description}</p>
   </PixelPanel>;
-}
-
-export function BackpackIcon() {
-  return <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square" strokeLinejoin="miter"><path d="M8 7V5a4 4 0 0 1 8 0v2M5 8h14l1 13H4L5 8Z"/><path d="M8 12h8"/></svg>;
 }
 
 export function SearchIcon() {

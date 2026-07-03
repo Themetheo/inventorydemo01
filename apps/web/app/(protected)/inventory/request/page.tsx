@@ -7,8 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  BackpackFab,
-  BackpackIcon,
   EmptyStatePixel,
   ItemMarketCard,
   PixelButton,
@@ -17,7 +15,12 @@ import {
   SearchIcon,
   StatusChip,
 } from "@/components/inventory-market";
+import { PixelCartButton } from "@/components/pixel-cart-button";
+import { CartViewportPortal, PixelCartDrawer } from "@/components/pixel-cart-drawer";
 import { get, post } from "@/lib/api";
+import { lockBodyScroll } from "@/lib/body-scroll-lock";
+import { filterValidItems } from "@/lib/items";
+import { MARKET_STALL_GRID_CLASS } from "@/lib/market-layout";
 import type { CreateRequestResult, RequestableItem, SessionUser } from "@/lib/types";
 import { useBackpack } from "@/stores/backpack";
 
@@ -52,18 +55,28 @@ export default function RequestRoomPage() {
 
   useEffect(() => {
     if (!open) return;
+    const unlockBodyScroll = lockBodyScroll(document.body);
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
     document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
+    return () => {
+      unlockBodyScroll();
+      document.removeEventListener("keydown", closeOnEscape);
+    };
   }, [open]);
 
+  const validItems = useMemo(() => filterValidItems(query.data ?? []), [query.data]);
   const categories = useMemo(() => Array.from(
-    new Map((query.data ?? []).map((v) => [v.category?.categoryId ?? "other", v.category?.categoryName ?? "อื่น ๆ"])),
+    new Map(validItems.map((v) => [v.category?.categoryId ?? "other", v.category?.categoryName ?? "อื่น ๆ"])),
     ([id, name]) => ({ id, name }),
-  ), [query.data]);
-  const filtered = (query.data ?? []).filter((v) => (!category || v.category?.categoryId === category) && v.itemName.toLowerCase().includes(search.toLowerCase()));
+  ), [validItems]);
+  const categoryCounts = useMemo(() => validItems.reduce<Record<string, number>>((counts, item) => {
+    const id = item.category?.categoryId ?? "other";
+    counts[id] = (counts[id] ?? 0) + 1;
+    return counts;
+  }, {}), [validItems]);
+  const filtered = validItems.filter((v) => (!category || (v.category?.categoryId ?? "other") === category) && v.itemName.toLowerCase().includes(search.toLowerCase()));
 
-  return <div className="request-market -m-4 min-h-[calc(100vh-4rem)] bg-[#fff2bd] p-4 text-[#18130f] sm:-m-6 sm:p-6 lg:-m-8 lg:p-8">
+  return <div className="request-market market-cart-clearance -m-4 min-h-[calc(100vh-4rem)] bg-[#fff2bd] p-4 text-[#18130f] sm:-m-6 sm:p-6 lg:-m-8 lg:p-8">
     <header className="market-entrance mb-7 border-b-2 border-black pb-6 sm:mb-8 sm:pb-8">
       <div className="mb-5 h-3 border-2 border-black bg-[repeating-linear-gradient(90deg,#d62b20_0_38px,#fffdf4_38px_76px)] shadow-[3px_3px_0_#18130f]" aria-hidden="true" />
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
@@ -87,14 +100,14 @@ export default function RequestRoomPage() {
         </div>
         <span className="text-xs font-bold text-stone-500">{filtered.length} รายการ</span>
       </div>
-      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0" role="group" aria-label="เลือกโซนสินค้า">
-        <PixelTab label="ทั้งหมด" code="ALL STALLS" active={!category} onClick={() => setCategory("")} />
-        {categories.map((v, index) => <PixelTab key={v.id} label={v.name} code={`STALL ${String(index + 1).padStart(2, "0")}`} active={category === v.id} onClick={() => setCategory(v.id)} />)}
+      <div className={MARKET_STALL_GRID_CLASS} role="group" aria-label="เลือกโซนสินค้า">
+        <PixelTab label="ทั้งหมด" code="ALL STALLS" count={validItems.length} active={!category} onClick={() => setCategory("")} />
+        {categories.map((v, index) => <PixelTab key={v.id} label={v.name} code={`STALL ${String(index + 1).padStart(2, "0")}`} count={categoryCounts[v.id] ?? 0} active={category === v.id} onClick={() => setCategory(v.id)} />)}
       </div>
     </section>
 
     <section aria-labelledby="market-items">
-      <label className="relative mb-6 block">
+      <label className="relative mb-6 block max-w-3xl">
         <span className="sr-only">ค้นหาของในตลาด</span>
         <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" aria-hidden="true"><SearchIcon /></span>
         <input className="market-field min-h-12 w-full border-2 border-black bg-white py-3 pl-12 pr-4 font-bold shadow-[4px_4px_0_#18130f] outline-none transition-shadow placeholder:font-medium placeholder:text-stone-400 focus:shadow-[4px_4px_0_#d62b20] focus-visible:ring-4 focus-visible:ring-red-600 focus-visible:ring-offset-2" placeholder="ค้นหาของในตลาด" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -115,20 +128,10 @@ export default function RequestRoomPage() {
       </div>}
     </section>
 
-    <BackpackFab count={bag.items.length} onClick={() => setOpen(true)} />
-
-    {open && <div className="market-backdrop fixed inset-0 z-50 bg-black/60" onMouseDown={(e) => { if (e.currentTarget === e.target) setOpen(false); }}>
-      <aside role="dialog" aria-modal="true" aria-labelledby="backpack-title" className="market-drawer absolute inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto border-t-2 border-black bg-[#fff9e5] p-4 shadow-[0_-6px_0_#d62b20] sm:left-auto sm:top-0 sm:w-[480px] sm:border-l-2 sm:border-t-0 sm:p-6 sm:shadow-[-6px_0_0_#d62b20]">
-        <div className="mb-5 flex items-start justify-between gap-4 border-b-2 border-black pb-4">
-          <div>
-            <p className="font-mono text-[10px] font-black tracking-[.2em] text-red-700">INVENTORY BAG</p>
-            <h2 id="backpack-title" className="mt-1 flex items-center gap-2 text-2xl font-black"><BackpackIcon /> กระเป๋าเบิกของ</h2>
-            <p className="mt-1 text-sm text-stone-500">ตรวจสอบของที่เลือกก่อนส่งคำขอ</p>
-          </div>
-          <button type="button" onClick={() => setOpen(false)} aria-label="ปิดกระเป๋าเบิก" className="market-button grid min-h-11 min-w-11 place-items-center border-2 border-black bg-white text-xl font-black shadow-[3px_3px_0_#18130f] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-600 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">×</button>
-        </div>
-
-        {!bag.items.length ? <EmptyStatePixel title="ยังไม่มีของในกระเป๋า" description="ลองเลือกของจากตลาดก่อน" /> : <form onSubmit={form.handleSubmit((v) => { if (!submit.isPending) submit.mutate(v); })}>
+    <CartViewportPortal>
+      <PixelCartButton count={bag.items.length} hidden={open} onClick={() => setOpen(true)} />
+      {open && <PixelCartDrawer onClose={() => setOpen(false)} footer={bag.items.length ? <PixelButton type="submit" form="inventory-cart-form" className="min-h-12 w-full text-base" disabled={submit.isPending || bag.items.some((v) => !Number.isFinite(v.requestedQty) || v.requestedQty <= 0)}>{submit.isPending ? "กำลังส่งคำขอ..." : "ส่งคำขอเบิก"}</PixelButton> : undefined}>
+        {!bag.items.length ? <EmptyStatePixel title="ยังไม่มีของในรถเข็น" description="ลองเลือกของจากตลาดก่อน" /> : <form id="inventory-cart-form" onSubmit={form.handleSubmit((v) => { if (!submit.isPending) submit.mutate(v); })}>
           <div className="mb-4 flex items-center justify-between border-2 border-black bg-amber-100 px-3 py-2 text-sm font-black">
             <span>ของที่เลือกทั้งหมด</span><span>{bag.items.length} รายการ</span>
           </div>
@@ -146,10 +149,9 @@ export default function RequestRoomPage() {
 
           <label className="mt-5 block"><span className="mb-2 block font-black">หมายเหตุทั้งคำขอ</span><textarea className="market-field min-h-24 w-full resize-y border-2 border-black bg-white p-3 outline-none placeholder:text-stone-400 focus-visible:ring-4 focus-visible:ring-red-600" placeholder="ข้อความถึงทีมสต๊อก (ถ้ามี)" {...form.register("note")} onChange={(e) => { form.setValue("note", e.target.value); bag.setRequestNote(e.target.value); }} /></label>
           {submit.error && <div className="mt-4"><MarketError error={submit.error} /></div>}
-          <PixelButton className="mt-5 w-full text-base" disabled={submit.isPending || !bag.items.length || bag.items.some((v) => !Number.isFinite(v.requestedQty) || v.requestedQty <= 0)}>{submit.isPending ? "กำลังส่งคำขอ..." : "ส่งคำขอเบิก"}</PixelButton>
         </form>}
-      </aside>
-    </div>}
+      </PixelCartDrawer>}
+    </CartViewportPortal>
   </div>;
 }
 

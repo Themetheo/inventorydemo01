@@ -22,7 +22,7 @@ export class InventoryService {
 
   async branches() { return (await this.repository.read("Branches")).map(mapBranch); }
   async categories() { return (await this.repository.read("Categories")).map(mapCategory).sort((a, b) => a.sortOrder - b.sortOrder); }
-  async items() { return (await this.repository.read("Items")).map(mapItem); }
+  async items() { return (await this.repository.read("Items")).map(mapItem).filter((item) => item.itemId.trim() !== "" && item.itemName.trim() !== ""); }
   async locations(branchId?: string) { const values = (await this.repository.read("Locations")).map(mapLocation); return branchId ? values.filter((v) => v.branchId === branchId) : values; }
   async storeItems(branchId: string) { return (await this.repository.read("Store_Items")).map(mapStoreItem).filter((v) => v.branchId === branchId); }
   async balances(branchId: string) { return (await this.repository.read("Stock_Balances", { fresh: true })).map(mapBalance).filter((v) => v.branchId === branchId); }

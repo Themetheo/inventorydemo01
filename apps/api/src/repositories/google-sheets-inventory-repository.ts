@@ -1,6 +1,6 @@
 import type { sheets_v4 } from "googleapis";
 import { SHEET_HEADERS, type SheetName, type SheetRecord } from "../models.js";
-import { assertHeaders, rowsToRecords, stringCell, toSheetValue } from "../utils/sheets.js";
+import { assertHeaders, filterValidItemRecords, rowsToRecords, stringCell, toSheetValue } from "../utils/sheets.js";
 import { AppError, sheetsWriteError } from "../errors.js";
 import type { InventoryRepository } from "./inventory-repository.js";
 
@@ -18,7 +18,8 @@ export class GoogleSheetsInventoryRepository implements InventoryRepository {
     const rows = (response.data.values ?? []) as string[][];
     const actualHeaders = (rows[0] ?? []).map(stringCell);
     assertHeaders(tab, SHEET_HEADERS[tab], actualHeaders);
-    const records = rowsToRecords(actualHeaders, rows.slice(1));
+    const mappedRecords = rowsToRecords(actualHeaders, rows.slice(1));
+    const records = tab === "Items" ? filterValidItemRecords(mappedRecords) : mappedRecords;
     if (MASTER_TABS.has(tab)) this.cache.set(tab, { expires: Date.now() + CACHE_MS, records });
     return structuredClone(records);
   }

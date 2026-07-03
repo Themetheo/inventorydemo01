@@ -82,6 +82,11 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: #d62b20; }
 .market-workspace .pixel-modal { border: 2px solid #18130f; box-shadow: 7px 7px 0 #d62b20; }
 .market-workspace > .fixed > form { border: 2px solid #18130f !important; box-shadow: 7px 7px 0 #d62b20; }
 .market-nav:active { transform: translate(3px, 3px); box-shadow: none; }
+.market-cart-clearance { padding-bottom: calc(8rem + env(safe-area-inset-bottom)); }
+
+@media (min-width: 1024px) {
+  .market-cart-clearance { padding-bottom: 7rem; }
+}
 
 .request-market {
   background-image:

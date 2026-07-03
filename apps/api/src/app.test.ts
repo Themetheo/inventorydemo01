@@ -31,6 +31,9 @@ describe("inventory API", () => {
     repository.data.Items = [
       { Item_ID: "I1", Item_Name: "ข้าว", Category_ID: "C1", Unit: "kg", Image_URL: "", Description: "", Is_Active: "TRUE", Created_At: "created-at" },
       { Item_ID: "I2", Item_Name: "ปิดใช้งาน", Category_ID: "C1", Unit: "ชิ้น", Image_URL: "/images/items/inactive.webp", Description: "", Is_Active: "FALSE", Created_At: "created-at" },
+      { Item_ID: "", Item_Name: "", Category_ID: "", Unit: "", Image_URL: "", Description: "", Is_Active: "FALSE", Created_At: "" },
+      { Item_ID: "I3", Item_Name: "", Category_ID: "C1", Unit: "ชิ้น", Image_URL: "", Description: "", Is_Active: "FALSE", Created_At: "" },
+      { Item_ID: "", Item_Name: "มีชื่ออย่างเดียว", Category_ID: "C1", Unit: "ชิ้น", Image_URL: "", Description: "", Is_Active: "TRUE", Created_At: "" },
     ];
     repository.data.Store_Items = [
       { Store_Item_ID: "SI1", Branch_ID: "B1", Item_ID: "I1", Min_Qty: 1, Target_Qty: 10, Default_Location_ID: "L2", Allow_Request: "TRUE", Require_Daily_Count: "TRUE", Is_Active: "TRUE" },
@@ -71,6 +74,11 @@ describe("inventory API", () => {
   it("does not expose inactive master items in the market", async () => {
     const response = await app.inject({ method: "GET", url: "/api/v1/requestable-items", headers: { cookie } });
     expect(response.json().data.some((item: { itemId: string }) => item.itemId === "I2")).toBe(false);
+  });
+  it("does not return blank or nameless rows as items", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/v1/items", headers: { cookie } });
+    expect(response.json().data).toHaveLength(2);
+    expect(response.json().data.map((item: { itemId: string }) => item.itemId)).toEqual(["I1", "I2"]);
   });
   it("allows staff to create a request and returns the stable contract", async () => { const response = await app.inject({ method: "POST", url: "/api/v1/stock-requests", headers: { cookie }, payload: { note: "test", items: [{ itemId: "I1", requestedQty: 2, unit: "kg" }] } }); expect(response.statusCode).toBe(200); expect(response.json()).toMatchObject({ ok: true, data: { status: "PENDING", itemCount: 1 } }); expect(repository.data.Stock_Requests).toHaveLength(1); expect(repository.data.Stock_Request_Items).toHaveLength(1); });
   it("rejects an empty backpack", async () => { const response = await app.inject({ method: "POST", url: "/api/v1/stock-requests", headers: { cookie }, payload: { items: [] } }); expect(response.statusCode).toBe(400); expect(response.json().error.code).toBe("VALIDATION_ERROR"); });

@@ -10,6 +10,10 @@ export function rowsToRecords(headers: readonly string[], rows: string[][]): She
   return rows.filter((row) => row.some((cell) => stringCell(cell) !== "")).map((row) => Object.fromEntries(headers.map((header, index) => [header, stringCell(row[index])]))) as SheetRecord[];
 }
 
+export function filterValidItemRecords(records: SheetRecord[]): SheetRecord[] {
+  return records.filter((record) => stringCell(record.Item_ID) !== "" && stringCell(record.Item_Name) !== "");
+}
+
 export function assertHeaders(tab: string, expected: readonly string[], actual: string[]): void {
   const normalized = actual.map(stringCell);
   const missing = expected.filter((header) => !normalized.includes(header));

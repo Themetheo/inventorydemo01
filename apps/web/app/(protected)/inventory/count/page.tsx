@@ -1,20 +1,98 @@
 "use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ErrorBox, PageHeader } from "@/components/page-kit";
+import { StockCountCard } from "@/components/stock-count-card";
 import { get, post } from "@/lib/api";
+import { filterValidItems } from "@/lib/items";
+import { buildStockCountPayload } from "@/lib/stock-count-payload";
 import type { Item, Location, StockBalance, StoreItem } from "@/lib/types";
 
-const schema = z.object({ locationId: z.string().min(1), countRound: z.enum(["OPENING", "MIDDAY", "CLOSING", "ADHOC"]), note: z.string(), items: z.array(z.object({ itemId: z.string(), itemName: z.string(), unit: z.string(), systemQty: z.number(), countedQty: z.coerce.number().min(0), note: z.string() })).min(1) }); type Form = z.infer<typeof schema>;
+const rounds = ["OPENING", "MIDDAY", "CLOSING", "ADHOC"] as const;
+const schema = z.object({
+  locationId: z.string().min(1),
+  countRound: z.enum(rounds),
+  note: z.string(),
+  items: z.array(z.object({ itemId: z.string(), itemName: z.string(), unit: z.string(), systemQty: z.number(), countedQty: z.coerce.number().min(0), note: z.string() })).min(1),
+});
+type Form = z.infer<typeof schema>;
+
 export default function CountPage() {
-  const client = useQueryClient(); const locations = useQuery({ queryKey: ["locations"], queryFn: () => get<Location[]>("/locations") }); const items = useQuery({ queryKey: ["items"], queryFn: () => get<Item[]>("/items") }); const store = useQuery({ queryKey: ["store-items"], queryFn: () => get<StoreItem[]>("/store-items") }); const balances = useQuery({ queryKey: ["balances"], queryFn: () => get<StockBalance[]>("/stock-balances") }); const form = useForm<Form>({ defaultValues: { locationId: "", countRound: "CLOSING", note: "", items: [] } }); const fields = useFieldArray({ control: form.control, name: "items" }); const locationId = form.watch("locationId");
-  useEffect(() => { if (!items.data || !store.data || !locationId) return; fields.replace(store.data.filter((s) => s.isActive && s.requireDailyCount).flatMap((s) => { const item = items.data?.find((i) => i.itemId === s.itemId && i.isActive); if (!item) return []; const systemQty = balances.data?.find((b) => b.locationId === locationId && b.itemId === item.itemId)?.currentQty ?? 0; return [{ itemId: item.itemId, itemName: item.itemName, unit: item.unit, systemQty, countedQty: systemQty, note: "" }]; })); }, [locationId, items.data, store.data, balances.data]);
-  const watched = form.watch("items"); const summary = useMemo(() => ({ equal: watched.filter((v) => v.countedQty === v.systemQty).length, over: watched.filter((v) => v.countedQty > v.systemQty).length, short: watched.filter((v) => v.countedQty < v.systemQty).length }), [watched]);
-  const save = useMutation({ mutationFn: ({ values, status }: { values: Form; status: "DRAFT" | "COMPLETED" }) => post("/stock-counts", { locationId: values.locationId, countRound: values.countRound, status, note: values.note, items: values.items.map((v) => ({ itemId: v.itemId, countedQty: v.countedQty, unit: v.unit, note: v.note })) }), onSuccess: () => { client.invalidateQueries({ queryKey: ["balances"] }); client.invalidateQueries({ queryKey: ["counts"] }); } });
-  const submit = (status: "DRAFT" | "COMPLETED") => form.handleSubmit((values) => { const parsed = schema.parse(values); if (status === "COMPLETED" && !window.confirm(`ยืนยันผล: ตรง ${summary.equal}, เกิน ${summary.over}, ขาด ${summary.short}`)) return; save.mutate({ values: parsed, status }); })();
-  return <><PageHeader eyebrow="Cycle count" title="นับสต๊อก" description="กรอกยอดจริงทั้งหมดในหน้าเดียว ระบบสร้าง Adjustment เมื่อยืนยันเสร็จ" /><div className="mb-5 grid gap-3 sm:grid-cols-3"><select className="field" {...form.register("locationId")}><option value="">เลือกตำแหน่ง</option>{locations.data?.filter((v) => v.isActive).map((v) => <option key={v.locationId} value={v.locationId}>{v.locationName}</option>)}</select><select className="field" {...form.register("countRound")}><option>OPENING</option><option>MIDDAY</option><option>CLOSING</option><option>ADHOC</option></select><input className="field" placeholder="หมายเหตุ" {...form.register("note")} /></div><div className="mb-4 grid grid-cols-3 gap-3">{[["ตรงกัน", summary.equal], ["เกิน", summary.over], ["ขาด", summary.short]].map(([label, value]) => <div className="border border-black bg-white p-3 text-center" key={String(label)}><p className="text-xs">{label}</p><p className="text-2xl font-black">{value}</p></div>)}</div>
-    {!locationId ? <p className="border border-dashed p-8 text-center">เลือกตำแหน่งเพื่อเริ่มนับ</p> : !fields.fields.length ? <p className="border border-dashed p-8 text-center">ไม่มีรายการที่ตั้งค่า Require Daily Count</p> : <div className="space-y-2">{fields.fields.map((field, index) => <div className="grid items-center gap-2 border border-black bg-white p-3 sm:grid-cols-[1fr_110px_140px_1fr]" key={field.id}><div><p className="font-bold">{field.itemName}</p><p className="text-xs text-zinc-500">ระบบ {field.systemQty} {field.unit}</p></div><p className={`font-black ${(watched[index]?.countedQty ?? 0) - field.systemQty < 0 ? "text-red-600" : ""}`}>ต่าง {(watched[index]?.countedQty ?? 0) - field.systemQty}</p><input className="field" aria-label={`นับ ${field.itemName}`} inputMode="decimal" type="number" min="0" step="0.01" {...form.register(`items.${index}.countedQty`)} /><input className="field" placeholder="หมายเหตุ" {...form.register(`items.${index}.note`)} /></div>)}</div>}{save.error && <div className="mt-4"><ErrorBox error={save.error} /></div>}<div className="mt-5 flex gap-3"><button className="btn-secondary" disabled={save.isPending} onClick={() => submit("DRAFT")}>บันทึก Draft</button><button className="btn-primary" disabled={save.isPending} onClick={() => submit("COMPLETED")}>ยืนยันนับเสร็จ</button></div>
-  </>;
+  const client = useQueryClient();
+  const locations = useQuery({ queryKey: ["locations"], queryFn: () => get<Location[]>("/locations") });
+  const items = useQuery({ queryKey: ["items"], queryFn: () => get<Item[]>("/items") });
+  const store = useQuery({ queryKey: ["store-items"], queryFn: () => get<StoreItem[]>("/store-items") });
+  const balances = useQuery({ queryKey: ["balances"], queryFn: () => get<StockBalance[]>("/stock-balances") });
+  const form = useForm<Form>({ defaultValues: { locationId: "", countRound: "CLOSING", note: "", items: [] } });
+  const fields = useFieldArray({ control: form.control, name: "items" });
+  const locationId = form.watch("locationId");
+  const countRound = form.watch("countRound");
+  const watched = form.watch("items");
+  const validItems = useMemo(() => filterValidItems(items.data ?? []), [items.data]);
+
+  useEffect(() => {
+    if (!store.data || !locationId) return;
+    fields.replace(store.data.filter((setting) => setting.isActive && setting.requireDailyCount).flatMap((setting) => {
+      const item = validItems.find((candidate) => candidate.itemId === setting.itemId && candidate.isActive);
+      if (!item) return [];
+      const systemQty = balances.data?.find((balance) => balance.locationId === locationId && balance.itemId === item.itemId)?.currentQty ?? 0;
+      return [{ itemId: item.itemId, itemName: item.itemName, unit: item.unit, systemQty, countedQty: systemQty, note: "" }];
+    }));
+  }, [locationId, validItems, store.data, balances.data]);
+
+  const summary = useMemo(() => ({
+    equal: watched.filter((value) => value.countedQty === value.systemQty).length,
+    over: watched.filter((value) => value.countedQty > value.systemQty).length,
+    short: watched.filter((value) => value.countedQty < value.systemQty).length,
+  }), [watched]);
+
+  const save = useMutation({
+    mutationFn: ({ values, status }: { values: Form; status: "DRAFT" | "COMPLETED" }) => post("/stock-counts", buildStockCountPayload(values, status)),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["balances"] }),
+        client.invalidateQueries({ queryKey: ["counts"] }),
+      ]);
+    },
+  });
+  const submit = (status: "DRAFT" | "COMPLETED") => form.handleSubmit((values) => {
+    const parsed = schema.parse(values);
+    if (status === "COMPLETED" && !window.confirm(`ยืนยันผล: ตรง ${summary.equal}, เกิน ${summary.over}, ขาด ${summary.short}`)) return;
+    save.mutate({ values: parsed, status });
+  })();
+
+  return <div className="-m-4 min-h-[calc(100vh-4rem)] overflow-x-clip bg-[#fff2bd] p-4 sm:-m-6 sm:p-6 lg:-m-8 lg:p-8">
+    <PageHeader eyebrow="Stock Count · Multi Item" title="นับสต๊อก" description="เลือกตำแหน่ง แล้วกรอกยอดจริงจากการ์ดสินค้าในหน้าเดียว" />
+
+    <section className="border-b-2 border-black pb-6">
+      <p className="font-mono text-[10px] font-black tracking-[.2em] text-red-700">COUNT SETUP</p>
+      <h2 className="mb-3 mt-1 text-xl font-black">ตำแหน่งที่นับ</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">{locations.data?.filter((location) => location.isActive).map((location) => <ChoiceCard key={location.locationId} label={location.locationName} code={location.locationType} active={locationId === location.locationId} onClick={() => form.setValue("locationId", location.locationId)} />)}</div>
+      <h2 className="mb-3 mt-6 text-xl font-black">รอบการนับ</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{rounds.map((round) => <ChoiceCard key={round} label={roundLabel(round)} code={round} active={countRound === round} onClick={() => form.setValue("countRound", round)} />)}</div>
+      <label className="mt-5 block max-w-3xl font-black">หมายเหตุทั้งรอบ<input className="field mt-2" placeholder="รายละเอียดรอบการนับ (ถ้ามี)" {...form.register("note")} /></label>
+    </section>
+
+    <section className="py-6">
+      <div className="mb-5 grid grid-cols-3 gap-3">{[["ตรงกัน", summary.equal], ["เกิน", summary.over], ["ขาด", summary.short]].map(([label, value]) => <div className="border-2 border-black bg-white p-3 text-center shadow-[3px_3px_0_#18130f]" key={String(label)}><p className="text-xs font-black text-stone-500">{label}</p><p className="mt-1 text-2xl font-black">{value}</p></div>)}</div>
+      {!locationId ? <div className="border-2 border-dashed border-black bg-white p-10 text-center font-black">เลือกตำแหน่งเพื่อเริ่มนับ</div> : !fields.fields.length ? <div className="border-2 border-dashed border-black bg-white p-10 text-center font-black">ไม่มีรายการที่ตั้งค่า Require Daily Count</div> : <div className="grid min-w-0 gap-5 xl:grid-cols-2">{fields.fields.map((field, index) => {
+        const item = validItems.find((candidate) => candidate.itemId === field.itemId);
+        if (!item) return null;
+        return <StockCountCard key={field.id} item={item} systemQty={field.systemQty} countedQty={Number(watched[index]?.countedQty ?? 0)} note={watched[index]?.note ?? ""} onCountedQtyChange={(value) => form.setValue(`items.${index}.countedQty`, value, { shouldDirty: true, shouldValidate: true })} onNoteChange={(value) => form.setValue(`items.${index}.note`, value, { shouldDirty: true })} />;
+      })}</div>}
+      {save.error && <div className="mt-5"><ErrorBox error={save.error} /></div>}
+      <div className="sticky bottom-[4.5rem] z-20 mt-6 grid grid-cols-2 gap-3 border-2 border-black bg-[#fff9e5] p-3 shadow-[5px_5px_0_#18130f] lg:bottom-4"><button type="button" className="btn-secondary min-h-12" disabled={save.isPending || !fields.fields.length} onClick={() => submit("DRAFT")}>บันทึก Draft</button><button type="button" className="btn-primary min-h-12" disabled={save.isPending || !fields.fields.length} onClick={() => submit("COMPLETED")}>{save.isPending ? "กำลังบันทึก..." : "บันทึกทั้งหมด"}</button></div>
+    </section>
+  </div>;
+}
+
+function ChoiceCard({ label, code, active, onClick }: { label: string; code: string; active: boolean; onClick: () => void }) {
+  return <button type="button" aria-pressed={active} onClick={onClick} className={`min-h-20 min-w-0 border-2 border-black p-3 text-left shadow-[4px_4px_0_#18130f] ${active ? "bg-red-600 text-white" : "bg-white hover:bg-amber-100"}`}><span className="block truncate font-black">{label}</span><span className="mt-1 block truncate font-mono text-[9px] font-black tracking-wider opacity-60">{code}</span></button>;
+}
+
+function roundLabel(round: typeof rounds[number]) {
+  return ({ OPENING: "เปิดร้าน", MIDDAY: "กลางวัน", CLOSING: "ปิดร้าน", ADHOC: "นับพิเศษ" } as const)[round];
 }

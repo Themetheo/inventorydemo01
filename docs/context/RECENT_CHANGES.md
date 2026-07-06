@@ -1,9 +1,10 @@
 # Recent Changes
 
-Latest 12 relevant commits at the 2026-07-06 context refresh. Keep this list to 10–15 entries and replace the oldest entries incrementally.
+Latest relevant changes at the 2026-07-07 context refresh. Keep this list to 10–15 entries and replace the oldest entries incrementally.
 
 | Commit | Date | Change | Primary context impact |
 | --- | --- | --- | --- |
+| Working tree | 2026-07-07 | Add item image upload and automatic WebP compression for create/edit forms | Client resize/quality pipeline, compressed preview/metadata, Next upload route, local image storage, tests |
 | `2a3c6f9` | 2026-07-04 | Fix inventory item synchronization and settings | Item/store-item service, repository, forms, providers, workflow docs |
 | `5e780df` | 2026-07-04 | Redesign login page | Login UI plus activity-related API/model/repository work |
 | `f4a5dab` | 2026-07-04 | Add activity tracking and refresh login | Partial activity/XP/KPI infrastructure and login visuals |

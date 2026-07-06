@@ -1,7 +1,7 @@
 # Current State
 
-- Updated: 2026-07-06
-- Verified commit: `2a3c6f9b606cf42b4640a07b8e12e510bd45b7e4`
+- Updated: 2026-07-07
+- Verified commit: `713ce1bb9c759fe697d673e3a6345f25da7553d8` plus the current item-upload working tree
 - Architecture baseline: `docs/inventory-mvp.md`
 - Evidence: current routes/imports, `InventoryService`, repository contract/adapter, sheet header definitions, and targeted Git history through the commit above.
 
@@ -9,7 +9,7 @@
 
 - Next.js App Router web app and Fastify API are connected through `/api/v1`; authentication uses a JWT in an httpOnly cookie.
 - Login/logout/session lookup are implemented, with role and branch enforcement in the API.
-- Item master supports list, create, edit, active state, category/unit, description, and image URL/path.
+- Item master supports list, create, edit, active state, category/unit, description, image URL/path, and WebP/PNG/JPG selection from both create and edit forms; the browser resizes to at most 800 × 600, compresses to WebP at or below 500 KB, then uploads.
 - Store Items supports per-branch enablement, min/target quantities, default location, request permission, and daily-count flag.
 - Locations support list, create, and edit for the configured location types.
 - Stock balances are shown by branch/location/item and are maintained as a projection.
@@ -26,7 +26,6 @@
 
 - User activity/XP/KPI types, sheet headers, repository methods, and service code exist, but no activity routes are registered in the current `apps/api/src/app.ts`; treat this capability as partial.
 - The web stock-count page creates counts but does not expose the API count list/detail as a history/detail workflow.
-- Item images support local paths and HTTPS URLs with fallback, but there is no upload pipeline.
 - Dashboard reports pending requests, low stock, and daily-count totals; it does not create replenishment orders automatically.
 - The architecture document describes 12 inventory tabs, while `apps/api/src/models.ts` currently declares 16 tabs after adding four activity/XP/KPI tabs. This documentation/schema expectation drift must be reconciled before relying on a full schema check.
 
@@ -38,6 +37,7 @@
 - Process restart clears the in-memory cache.
 - Balance correctness depends on movement writes and projection updates staying synchronized; rebuild is restricted to owner.
 - External Sheets verification requires configured credentials and access to the live spreadsheet; local unit tests do not prove live schema/data correctness.
+- Uploaded item images are stored on the web process filesystem under `apps/web/public/images/items/`; persistence therefore depends on the deployment filesystem. Clearing or replacing an image does not delete the old file in this phase.
 
 ## Current priorities
 

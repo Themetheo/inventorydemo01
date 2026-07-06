@@ -14,6 +14,25 @@ export function isValidItemImageInput(value: string): boolean {
   return (input.startsWith("/") || /^https:\/\//i.test(input)) && normalizeImageUrl(input) !== "";
 }
 
+export function isLocalMachineImagePath(value: string): boolean {
+  const input = value.trim();
+  const quoted = input.length >= 2 && ((input.startsWith('"') && input.endsWith('"')) || (input.startsWith("'") && input.endsWith("'")));
+  return quoted
+    || /^file:\/\//i.test(input)
+    || /^[a-z]:[\\/]/i.test(input)
+    || /^\\\\/.test(input);
+}
+
+export function getItemImageInputError(value: string): string | undefined {
+  if (isLocalMachineImagePath(value)) {
+    return "ไม่สามารถใช้ path จากเครื่องได้ กรุณากดเลือกรูปจากเครื่อง";
+  }
+  if (!isValidItemImageInput(value)) {
+    return "ใช้ path ที่ขึ้นต้นด้วย / หรือ HTTPS URL ของไฟล์ webp, png, jpg, jpeg";
+  }
+  return undefined;
+}
+
 export function getItemPlaceholderText(itemName: string): string {
   const name = itemName.trim();
   if (!name) return "?";

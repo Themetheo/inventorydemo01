@@ -1,9 +1,10 @@
 # Recent Changes
 
-Latest relevant changes at the 2026-07-07 context refresh. Keep this list to 10–15 entries and replace the oldest entries incrementally.
+Latest relevant changes at the 2026-07-08 context refresh. Keep this list to 10–15 entries and replace the oldest entries incrementally.
 
 | Commit | Date | Change | Primary context impact |
 | --- | --- | --- | --- |
+| Working tree | 2026-07-08 | Add paper stock-count print, scan, OCR review, and completion workflow | New `/inventory/count/paper`, `/inventory/count/scan`, `/inventory/count/[countId]` routes; new stock-count OCR APIs; expanded `Stock_Counts` and `Stock_Count_Items` columns; mock OCR provider remains |
 | Working tree | 2026-07-07 | Add internal-order document preview/print route and resolve Codespaces public URL access | New document preview components/route; public web access works on port `3001` after port `3000` tunnel returned `502`; API remains public on `4000` |
 | Working tree | 2026-07-07 | Add item image upload and automatic WebP compression for create/edit forms | Client resize/quality pipeline, compressed preview/metadata, Next upload route, local image storage, tests |
 | `2a3c6f9` | 2026-07-04 | Fix inventory item synchronization and settings | Item/store-item service, repository, forms, providers, workflow docs |

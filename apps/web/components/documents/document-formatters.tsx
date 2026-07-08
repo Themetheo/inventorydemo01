@@ -34,6 +34,15 @@ export function displayRequestNumber(request: Pick<StockRequest, "requestDate" |
   return `REQ-${compactDate || "NO-DATE"}-${tail || "NO-ID"}`;
 }
 
+export function displayCountNumber(count: { countDate?: string; createdAt?: string; countId: string; documentCode?: string }) {
+  if (count.documentCode?.trim()) return count.documentCode.trim();
+  const compactDate = (count.countDate || count.createdAt || "")
+    .slice(0, 10)
+    .replace(/\D/g, "");
+  const tail = count.countId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase();
+  return `CNT-${compactDate || "NO-DATE"}-${tail || "NO-ID"}`;
+}
+
 export function displayUserName(user: UserSummary | undefined, emptyText: string) {
   const name = user?.displayName?.trim() || user?.username?.trim();
   return name || emptyText;

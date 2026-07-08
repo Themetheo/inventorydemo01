@@ -56,6 +56,12 @@ This is a compact index of durable decisions already reflected in code or `docs/
 - Decision: The browser preserves aspect ratio, caps selected images at 800 × 600 without upscaling, converts them to WebP, and reduces quality then dimensions until the result is at most 500 KB. The Next.js upload route independently enforces the 500 KB WebP/PNG/JPG limit, verifies MIME and file signatures, generates a filename from a sanitized item ID plus timestamp and random suffix, and stores it under `apps/web/public/images/items/`.
 - Consequence: Items persist only the `/images/items/...` URL through the existing API. Clearing or replacing an image does not delete files in this phase, and deployments must provide a persistent writable web filesystem if uploads must survive process/container replacement.
 
+## D-010 — Paper count OCR extends existing count tabs
+
+- Status: active as of 2026-07-08
+- Decision: Paper/OCR metadata lives in trailing columns on `Stock_Counts` and `Stock_Count_Items` instead of separate OCR tabs because it is row-level metadata for the existing count aggregate.
+- Consequence: Existing count routes and repository methods can keep using `read`, `append`, and `upsert`, but live spreadsheets must add the new trailing columns before schema checks pass.
+
 ## Open decision gap
 
 `docs/inventory-mvp.md` documents 12 inventory tabs, while current model headers include four additional activity/XP/KPI tabs. The repository does not establish whether this partial surface is production architecture or unfinished work; resolve that explicitly before updating the canonical tab count.

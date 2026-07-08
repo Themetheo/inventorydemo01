@@ -61,6 +61,8 @@ describe("inventory API", () => {
       { Store_Item_ID: "SI1", Branch_ID: "B1", Item_ID: "I1", Min_Qty: 1, Target_Qty: 10, Default_Location_ID: "L2", Allow_Request: "TRUE", Require_Daily_Count: "TRUE", Is_Active: "TRUE" },
       { Store_Item_ID: "SI2", Branch_ID: "B1", Item_ID: "I2", Min_Qty: 1, Target_Qty: 10, Default_Location_ID: "L2", Allow_Request: "TRUE", Require_Daily_Count: "FALSE", Is_Active: "TRUE" },
     ];
+    repository.data.Locations = [{ Location_ID: "L2", Location_Name: "ครัว", Branch_ID: "B1", Location_Type: "KITCHEN", Is_Active: "TRUE" }];
+    repository.data.Stock_Balances = [{ Balance_ID: "BAL-B1-L2-I1", Branch_ID: "B1", Location_ID: "L2", Item_ID: "I1", Current_Qty: 5, Updated_At: "before" }];
     app = await buildApp(repository); await app.ready();
     for (const role of ["owner", "manager", "stock", "staff"] as const) {
       const login = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: role, password: "pass" } });
@@ -109,4 +111,53 @@ describe("inventory API", () => {
   it("rejects zero and negative quantities", async () => { for (const requestedQty of [0, -1]) { const response = await app.inject({ method: "POST", url: "/api/v1/stock-requests", headers: { cookie }, payload: { items: [{ itemId: "I1", requestedQty, unit: "kg" }] } }); expect(response.statusCode).toBe(400); } });
   it("merges duplicate items before writing", async () => { const before = repository.data.Stock_Request_Items.length; const response = await app.inject({ method: "POST", url: "/api/v1/stock-requests", headers: { cookie }, payload: { items: [{ itemId: "I1", requestedQty: 2, unit: "kg" }, { itemId: "I1", requestedQty: 3, unit: "kg" }] } }); expect(response.json().data.itemCount).toBe(1); expect(repository.data.Stock_Request_Items[before]?.Requested_Qty).toBe(5); });
   it("does not duplicate a retried request with the same idempotency key", async () => { const key = "123e4567-e89b-42d3-a456-426614174000"; const payload = { items: [{ itemId: "I1", requestedQty: 1, unit: "kg" }] }; const before = repository.data.Stock_Requests.length; const first = await app.inject({ method: "POST", url: "/api/v1/stock-requests", headers: { cookie, "idempotency-key": key }, payload }); const second = await app.inject({ method: "POST", url: "/api/v1/stock-requests", headers: { cookie, "idempotency-key": key }, payload }); expect(second.json().data.requestId).toBe(first.json().data.requestId); expect(repository.data.Stock_Requests).toHaveLength(before + 1); });
+  it("creates a paper stock count from requireDailyCount items and unique document codes", async () => {
+    const payload = { locationId: "L2", countRound: "CLOSING", requireDailyCountOnly: true, itemIds: ["I1", "I2"], sortBy: "CATEGORY" };
+    const first = await app.inject({ method: "POST", url: "/api/v1/stock-counts/paper", headers: { cookie: roleCookies.stock }, payload });
+    const second = await app.inject({ method: "POST", url: "/api/v1/stock-counts/paper", headers: { cookie: roleCookies.stock }, payload });
+    expect(first.statusCode).toBe(200);
+    expect(first.json().data.items).toHaveLength(1);
+    expect(first.json().data.items[0]).toMatchObject({ itemId: "I1", rowNumber: 1, countedQty: null, reviewStatus: "UNREAD" });
+    expect(first.json().data.documentCode).not.toBe(second.json().data.documentCode);
+  });
+  it("forbids staff from paper count APIs", async () => {
+    const response = await app.inject({ method: "POST", url: "/api/v1/stock-counts/paper", headers: { cookie: roleCookies.staff }, payload: { locationId: "L2", countRound: "CLOSING", itemIds: ["I1"] } });
+    expect(response.statusCode).toBe(403);
+  });
+  it("runs mock OCR and flags confidence states without system quantity fallback", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/v1/stock-counts/paper", headers: { cookie: roleCookies.stock }, payload: { locationId: "L2", countRound: "CLOSING", requireDailyCountOnly: true, itemIds: ["I1"] } });
+    const countId = created.json().data.countId;
+    const response = await app.inject({ method: "POST", url: `/api/v1/stock-counts/${countId}/ocr`, headers: { cookie: roleCookies.stock }, payload: { files: [{ fileName: "scan.jpg", mimeType: "image/jpeg", size: 1234, pageNumber: 1, fingerprint: "scan:1234" }] } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data.ocrStatus).toBe("REVIEW");
+    expect(response.json().data.items[0].ocrConfidence).toBeGreaterThan(0);
+    expect(response.json().data.items[0].countedQty).not.toBe(5);
+  });
+  it("rejects duplicate upload files and negative reviewed quantities", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/v1/stock-counts/paper", headers: { cookie: roleCookies.stock }, payload: { locationId: "L2", countRound: "CLOSING", itemIds: ["I1"] } });
+    const countId = created.json().data.countId;
+    const duplicate = await app.inject({ method: "POST", url: `/api/v1/stock-counts/${countId}/ocr`, headers: { cookie: roleCookies.stock }, payload: { files: [
+      { fileName: "scan.jpg", mimeType: "image/jpeg", size: 1234, pageNumber: 1, fingerprint: "same" },
+      { fileName: "scan-copy.jpg", mimeType: "image/jpeg", size: 1234, pageNumber: 2, fingerprint: "same" },
+    ] } });
+    expect(duplicate.statusCode).toBe(409);
+    const negative = await app.inject({ method: "PATCH", url: `/api/v1/stock-counts/${countId}/items`, headers: { cookie: roleCookies.stock }, payload: { items: [{ rowNumber: 1, countedQty: -1, reviewStatus: "CONFIRMED" }] } });
+    expect(negative.statusCode).toBe(400);
+  });
+  it("requires confirmed items before completing and does not duplicate completion movements", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/v1/stock-counts/paper", headers: { cookie: roleCookies.stock }, payload: { locationId: "L2", countRound: "CLOSING", itemIds: ["I1"] } });
+    const countId = created.json().data.countId;
+    const blocked = await app.inject({ method: "POST", url: `/api/v1/stock-counts/${countId}/complete`, headers: { cookie: roleCookies.stock } });
+    expect(blocked.statusCode).toBe(409);
+    const patch = await app.inject({ method: "PATCH", url: `/api/v1/stock-counts/${countId}/items`, headers: { cookie: roleCookies.stock }, payload: { items: [{ rowNumber: 1, countedQty: 6, reviewStatus: "CONFIRMED" }] } });
+    expect(patch.statusCode).toBe(200);
+    const before = repository.data.Stock_Movements.length;
+    const completed = await app.inject({ method: "POST", url: `/api/v1/stock-counts/${countId}/complete`, headers: { cookie: roleCookies.stock } });
+    const retried = await app.inject({ method: "POST", url: `/api/v1/stock-counts/${countId}/complete`, headers: { cookie: roleCookies.stock } });
+    expect(completed.statusCode).toBe(200);
+    expect(retried.statusCode).toBe(200);
+    expect(repository.data.Stock_Movements).toHaveLength(before + 1);
+    expect(repository.data.Stock_Movements.at(-1)).toMatchObject({ Movement_Type: "ADJUSTMENT", To_Location_ID: "L2", Qty: 1, Reference_Type: "COUNT", Reference_ID: countId });
+    expect(repository.data.Stock_Balances.find((row) => row.Balance_ID === "BAL-B1-L2-I1")?.Current_Qty).toBe(6);
+  });
 });

@@ -16,6 +16,11 @@ export function filterValidItemRecords(records: SheetRecord[]): SheetRecord[] {
 
 export function assertHeaders(tab: string, expected: readonly string[], actual: string[]): void {
   const normalized = actual.map(stringCell);
-  const missing = expected.filter((header) => !normalized.includes(header));
+  const required = tab === "Stock_Counts"
+    ? ["Count_ID", "Count_Date", "Branch_ID", "Location_ID", "Count_Round", "Counted_By", "Count_Status", "Note", "Created_At"]
+    : tab === "Stock_Count_Items"
+      ? ["Count_Item_ID", "Count_ID", "Item_ID", "System_Qty", "Counted_Qty", "Variance_Qty", "Unit", "Note", "Row_Number"]
+      : expected;
+  const missing = required.filter((header) => !normalized.includes(header));
   if (missing.length) throw new AppError(500, "SHEETS_SCHEMA_ERROR", `ตาราง ${tab} ไม่มีคอลัมน์ ${missing.join(", ")}`);
 }

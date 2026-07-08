@@ -1,15 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
+import { useState } from "react";
 import { z } from "zod";
-import { ActionBar, EmptyState, ErrorBox, FormField, GameButton, GamePanel, PageHeader, SelectableTile } from "@/components/page-kit";
+import { ActionBar, DataTableShell, EmptyState, ErrorBox, FormField, GameButton, GamePanel, PageHeader, SelectableTile, StatusBadge } from "@/components/page-kit";
 import { StockCountCard } from "@/components/stock-count-card";
 import { get, post } from "@/lib/api";
 import { filterValidItems } from "@/lib/items";
 import { buildStockCountPayload } from "@/lib/stock-count-payload";
-import type { Item, Location, StockBalance, StoreItem } from "@/lib/types";
+import type { Item, Location, StockBalance, StockCount, StoreItem } from "@/lib/types";
 
 const rounds = ["OPENING", "MIDDAY", "CLOSING", "ADHOC"] as const;
 const schema = z.object({
@@ -26,6 +28,8 @@ export default function CountPage() {
   const items = useQuery({ queryKey: ["items"], queryFn: () => get<Item[]>("/items") });
   const store = useQuery({ queryKey: ["store-items"], queryFn: () => get<StoreItem[]>("/store-items") });
   const balances = useQuery({ queryKey: ["balances"], queryFn: () => get<StockBalance[]>("/stock-balances") });
+  const counts = useQuery({ queryKey: ["counts"], queryFn: () => get<StockCount[]>("/stock-counts") });
+  const [historyFilters, setHistoryFilters] = useState({ status: "", source: "", documentCode: "", date: "", locationId: "" });
   const form = useForm<Form>({ defaultValues: { locationId: "", countRound: "CLOSING", note: "", items: [] } });
   const fields = useFieldArray({ control: form.control, name: "items" });
   const locationId = form.watch("locationId");
@@ -48,6 +52,14 @@ export default function CountPage() {
     over: watched.filter((value) => value.countedQty > value.systemQty).length,
     short: watched.filter((value) => value.countedQty < value.systemQty).length,
   }), [watched]);
+  const filteredCounts = useMemo(() => (counts.data ?? []).filter((count) => {
+    if (historyFilters.status && count.countStatus !== historyFilters.status) return false;
+    if (historyFilters.source && count.source !== historyFilters.source) return false;
+    if (historyFilters.date && count.countDate !== historyFilters.date) return false;
+    if (historyFilters.locationId && count.locationId !== historyFilters.locationId) return false;
+    if (historyFilters.documentCode && !(count.documentCode || count.countId).toLowerCase().includes(historyFilters.documentCode.toLowerCase())) return false;
+    return true;
+  }), [counts.data, historyFilters]);
 
   const save = useMutation({
     mutationFn: ({ values, status }: { values: Form; status: "DRAFT" | "COMPLETED" }) => post("/stock-counts", buildStockCountPayload(values, status)),
@@ -65,7 +77,8 @@ export default function CountPage() {
   })();
 
   return <div className="min-w-0 overflow-x-clip">
-    <PageHeader eyebrow="Stock Count · Multi Item" title="นับสต๊อก" description="เลือกตำแหน่ง แล้วกรอกยอดจริงจากการ์ดสินค้าในหน้าเดียว" />
+    <PageHeader eyebrow="Stock Count" title="นับสต๊อก" description="นับในระบบ พิมพ์ใบนับกระดาษ สแกน OCR และดูประวัติการนับ" actions={<div className="flex flex-wrap gap-2"><Link className="game-button game-button--secondary game-button--md" href="/inventory/count/paper">พิมพ์ใบนับ</Link><Link className="game-button game-button--secondary game-button--md" href="/inventory/count/scan">สแกนใบนับ</Link></div>} />
+    <nav className="mb-5 flex flex-wrap gap-2"><span className="game-button game-button--primary game-button--md">นับในระบบ</span><Link className="game-button game-button--secondary game-button--md" href="/inventory/count/paper">พิมพ์ใบนับ</Link><Link className="game-button game-button--secondary game-button--md" href="/inventory/count/scan">สแกนใบนับ</Link><a className="game-button game-button--ghost game-button--md" href="#count-history">ประวัติการนับ</a></nav>
 
     <section className="border-b-2 border-[var(--color-game-border-strong)] pb-6">
       <p className="page-market-header__eyebrow">COUNT SETUP</p>
@@ -85,6 +98,18 @@ export default function CountPage() {
       })}</div>}
       {save.error && <div className="mt-5"><ErrorBox error={save.error} /></div>}
       <ActionBar sticky className="bottom-[4.5rem] mt-6 lg:bottom-4"><GameButton variant="secondary" size="lg" className="flex-1" disabled={save.isPending || !fields.fields.length} onClick={() => submit("DRAFT")}>บันทึก Draft</GameButton><GameButton size="lg" className="flex-1" disabled={save.isPending || !fields.fields.length} onClick={() => submit("COMPLETED")}>{save.isPending ? "กำลังบันทึก..." : "บันทึกทั้งหมด"}</GameButton></ActionBar>
+    </section>
+
+    <section id="count-history" className="border-t-2 border-[var(--color-game-border-strong)] py-6">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><p className="page-market-header__eyebrow">COUNT HISTORY</p><h2 className="text-xl font-black text-[var(--color-game-brown)]">ประวัติการนับ</h2></div><StatusBadge tone="info">{filteredCounts.length} รายการ</StatusBadge></div>
+      <GamePanel className="mb-4 grid gap-3 p-4 md:grid-cols-5">
+        <FormField label="วันที่"><input type="date" value={historyFilters.date} onChange={(event) => setHistoryFilters((value) => ({ ...value, date: event.target.value }))} /></FormField>
+        <FormField label="ตำแหน่ง"><select value={historyFilters.locationId} onChange={(event) => setHistoryFilters((value) => ({ ...value, locationId: event.target.value }))}><option value="">ทั้งหมด</option>{locations.data?.map((location) => <option key={location.locationId} value={location.locationId}>{location.locationName}</option>)}</select></FormField>
+        <FormField label="สถานะ"><select value={historyFilters.status} onChange={(event) => setHistoryFilters((value) => ({ ...value, status: event.target.value }))}><option value="">ทั้งหมด</option><option value="DRAFT">DRAFT</option><option value="COMPLETED">COMPLETED</option></select></FormField>
+        <FormField label="Source"><select value={historyFilters.source} onChange={(event) => setHistoryFilters((value) => ({ ...value, source: event.target.value }))}><option value="">ทั้งหมด</option><option value="WEB">WEB</option><option value="PAPER_OCR">PAPER_OCR</option></select></FormField>
+        <FormField label="Document Code"><input value={historyFilters.documentCode} onChange={(event) => setHistoryFilters((value) => ({ ...value, documentCode: event.target.value }))} placeholder="CNT-..." /></FormField>
+      </GamePanel>
+      {counts.isLoading ? <EmptyState title="กำลังโหลดประวัติ" /> : !filteredCounts.length ? <EmptyState title="ยังไม่มีประวัติตามตัวกรอง" /> : <DataTableShell><table><thead><tr><th>Document</th><th>วันที่</th><th>ตำแหน่ง</th><th>สถานะ</th><th>Source</th><th>รายการ</th><th /></tr></thead><tbody>{filteredCounts.map((count) => <tr key={count.countId}><td><strong>{count.documentCode || count.countId}</strong></td><td>{count.countDate}</td><td>{locations.data?.find((location) => location.locationId === count.locationId)?.locationName ?? count.locationId}</td><td><StatusBadge tone={count.countStatus === "COMPLETED" ? "success" : "warning"}>{count.countStatus}</StatusBadge></td><td>{count.source}</td><td>{count.items?.length ?? 0}</td><td><Link className="font-bold underline" href={`/inventory/count/${count.countId}`}>เปิด</Link></td></tr>)}</tbody></table></DataTableShell>}
     </section>
   </div>;
 }

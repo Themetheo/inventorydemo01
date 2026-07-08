@@ -80,8 +80,15 @@ export async function buildApp(repository: InventoryRepository): Promise<Fastify
   app.post(`${prefix}/stock-movements`, stock, async (request) => ok(await service.createMovement(request.user, movementSchema.parse(request.body))));
   app.get(`${prefix}/stock-movements`, stock, async (request) => ok(await service.movements(request.user)));
   app.post(`${prefix}/stock-counts`, stock, async (request) => ok(await service.createCount(request.user, countSchema.parse(request.body))));
+  app.post(`${prefix}/stock-counts/paper`, stock, async (request) => ok(await service.createPaperCount(request.user, paperCountSchema.parse(request.body))));
   app.get(`${prefix}/stock-counts`, stock, async (request) => ok(await service.counts(request.user)));
-  app.get(`${prefix}/stock-counts/:countId`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; const value = (await service.counts(request.user)).find((v) => v.countId === countId); if (!value) throw new AppError(404, "COUNT_NOT_FOUND", "ไม่พบการนับสต๊อก"); return ok(value); });
+  app.get(`${prefix}/stock-counts/:countId`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; return ok(await service.countDetail(request.user, countId)); });
+  app.get(`${prefix}/stock-counts/:countId/print`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; return ok(await service.countDetail(request.user, countId)); });
+  app.post(`${prefix}/stock-counts/:countId/uploads`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; const body = uploadSchema.parse(request.body); return ok(await service.processCountOcr(request.user, countId, body.files)); });
+  app.post(`${prefix}/stock-counts/:countId/ocr`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; const body = uploadSchema.parse(request.body); return ok(await service.processCountOcr(request.user, countId, body.files)); });
+  app.get(`${prefix}/stock-counts/:countId/ocr-result`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; return ok(await service.countDetail(request.user, countId)); });
+  app.patch(`${prefix}/stock-counts/:countId/items`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; const body = countItemsPatchSchema.parse(request.body); return ok(await service.updateCountItems(request.user, countId, body.items, body.saveAsDraft)); });
+  app.post(`${prefix}/stock-counts/:countId/complete`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; return ok(await service.completeCount(request.user, countId)); });
   app.post(`${prefix}/admin/rebuild-stock-balances`, owner, async (request) => ok(await service.rebuildBalances(request.user)));
   return app;
 }
@@ -94,6 +101,35 @@ const storeItemsSchema = z.object({ branchId: z.string().min(1), items: z.array(
 export const requestSchema = z.object({ note: z.string().trim().max(500).optional(), items: z.array(z.object({ itemId: z.string().trim().min(1), requestedQty: z.number().positive(), unit: z.string().trim().min(1), note: z.string().trim().max(500).optional() })).min(1, "กรุณาเลือกสินค้าอย่างน้อยหนึ่งรายการ") });
 const movementSchema = z.object({ movementId: z.string().optional(), itemId: z.string().min(1), movementType: z.enum(["RECEIVE", "ISSUE", "TRANSFER", "WASTE", "RETURN", "ADJUSTMENT"]), fromLocationId: z.string().optional(), toLocationId: z.string().optional(), qty: z.number().positive(), unit: z.string().min(1), note: z.string().optional(), adjustmentDirection: z.enum(["increase", "decrease"]).optional(), overrideNegative: z.boolean().optional() });
 const countSchema = z.object({ locationId: z.string().min(1), countRound: z.enum(["OPENING", "MIDDAY", "CLOSING", "ADHOC"]), status: z.enum(["DRAFT", "COMPLETED"]), note: z.string().optional(), items: z.array(z.object({ itemId: z.string(), countedQty: z.number().min(0), unit: z.string(), note: z.string().optional() })).min(1) });
+const paperCountSchema = z.object({
+  locationId: z.string().min(1),
+  countRound: z.enum(["OPENING", "MIDDAY", "CLOSING", "ADHOC"]),
+  categoryId: z.string().optional(),
+  requireDailyCountOnly: z.boolean().optional(),
+  itemIds: z.array(z.string().min(1)).optional(),
+  sortBy: z.enum(["CATEGORY", "LOCATION"]).optional(),
+  note: z.string().trim().max(500).optional(),
+});
+const uploadSchema = z.object({
+  files: z.array(z.object({
+    fileName: z.string().trim().min(1).max(160),
+    mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
+    size: z.number().int().positive().max(12 * 1024 * 1024),
+    pageNumber: z.number().int().positive(),
+    fingerprint: z.string().trim().max(240).optional(),
+  })).min(1),
+});
+const countItemsPatchSchema = z.object({
+  saveAsDraft: z.boolean().optional().default(true),
+  items: z.array(z.object({
+    countItemId: z.string().optional(),
+    itemId: z.string().optional(),
+    rowNumber: z.number().int().positive().optional(),
+    countedQty: z.number().min(0).nullable(),
+    note: z.string().trim().max(500).optional(),
+    reviewStatus: z.enum(["UNREAD", "OCR_RECOGNIZED", "NEEDS_REVIEW", "CONFIRMED"]).optional(),
+  })).min(1),
+});
 
 export function isAllowedOrigin(origin: string | undefined, configured: string[]): boolean {
   if (!origin || configured.includes(origin)) return true;

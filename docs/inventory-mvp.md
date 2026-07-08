@@ -15,12 +15,20 @@ Google Sheets เป็น adapter ปัจจุบันเท่านั้
 
 ## Google Sheets tabs
 
-ระบบตรวจ schema ของ 12 tabs ต่อไปนี้: `Users`, `Branches`, `Categories`, `Items`,
+ระบบตรวจ schema ของ 12 inventory tabs ต่อไปนี้: `Users`, `Branches`, `Categories`, `Items`,
 `Store_Items`, `Locations`, `Stock_Balances`, `Stock_Movements`, `Stock_Requests`,
 `Stock_Request_Items`, `Stock_Counts` และ `Stock_Count_Items`
 
 หัวตารางใช้ชื่อเดิมแบบ `Item_ID`; mapper ใน API แปลงเป็น camelCase model
 checkbox `TRUE/FALSE` และตัวเลขถูก parse ก่อนใช้งาน
+
+`Stock_Counts` มีคอลัมน์ท้ายตารางสำหรับ paper/OCR workflow:
+`Source`, `Document_Code`, `OCR_Status`, `Original_Image_URL`, `OCR_Confidence`,
+`Printed_At`, `Uploaded_At`, `Reviewed_By`, `Reviewed_At`, `Completed_By`,
+`Completed_At`
+
+`Stock_Count_Items` มีคอลัมน์ท้ายตารางสำหรับ row/OCR/review:
+`Row_Number`, `OCR_Raw_Value`, `OCR_Confidence`, `Review_Status`, `Reviewed_Qty`
 
 ## Environment variables
 
@@ -99,13 +107,13 @@ route จะสร้างชื่อใหม่จาก item ID ที่ s
 5. Staff เลือกห้องสินค้า ใส่ของในกระเป๋า และส่ง request
 6. Stock/manager เปิดห้องคลัง อนุมัติและจ่ายเต็มหรือบางส่วน
 7. การจ่ายสร้าง `TRANSFER` movement และอัปเดต balance ต้นทาง/ปลายทาง
-8. ทำ stock count; เมื่อ complete ระบบสร้าง `ADJUSTMENT` สำหรับ variance
+8. ทำ stock count ในระบบหรือพิมพ์ใบนับกระดาษ; เมื่อ complete ระบบสร้าง `ADJUSTMENT` สำหรับ variance
 
 ## Role access
 
 - `owner`: ทุกหน้า รวม rebuild balance
 - `manager`: master data และงาน inventory ทั้งหมด ยกเว้น rebuild
-- `stock`: request, issue, movement, count และ balance
+- `stock`: request, issue, movement, count, paper OCR review และ balance
 - `staff`: เลือกสินค้า สร้างคำขอ ดู/ยกเลิกคำขอของตนเอง
 
 API ตรวจ role และ branch ซ้ำทุกครั้ง การซ่อนเมนูไม่ใช่ security boundary

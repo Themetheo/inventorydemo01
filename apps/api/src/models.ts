@@ -2,6 +2,9 @@ export type Role = "owner" | "manager" | "stock" | "staff";
 export type RequestStatus = "PENDING" | "APPROVED" | "PARTIAL" | "COMPLETED" | "REJECTED" | "CANCELLED";
 export type MovementType = "RECEIVE" | "ISSUE" | "TRANSFER" | "WASTE" | "RETURN" | "ADJUSTMENT";
 export type LocationType = "WAREHOUSE" | "FRIDGE" | "KITCHEN" | "COUNTER" | "STORAGE";
+export type CountSource = "WEB" | "PAPER_OCR";
+export type CountOcrStatus = "PENDING" | "PROCESSING" | "REVIEW" | "CONFIRMED" | "FAILED";
+export type CountInputStatus = "UNREAD" | "OCR_RECOGNIZED" | "NEEDS_REVIEW" | "CONFIRMED";
 
 export interface User {
   userId: string;
@@ -27,8 +30,43 @@ export interface StockBalance { balanceId: string; branchId: string; locationId:
 export interface StockMovement { movementId: string; movementDate: string; branchId: string; itemId: string; movementType: MovementType; fromLocationId: string; toLocationId: string; qty: number; unit: string; referenceType: string; referenceId: string; createdBy: string; note: string; createdAt: string }
 export interface StockRequest { requestId: string; requestDate: string; branchId: string; requestedBy: string; requestStatus: RequestStatus; approvedBy: string; completedAt: string; note: string; createdAt: string }
 export interface StockRequestItem { requestItemId: string; requestId: string; itemId: string; requestedQty: number; approvedQty: number; issuedQty: number; unit: string; itemStatus: string; note: string }
-export interface StockCount { countId: string; countDate: string; branchId: string; locationId: string; countRound: string; countedBy: string; countStatus: string; note: string; createdAt: string }
-export interface StockCountItem { countItemId: string; countId: string; itemId: string; systemQty: number; countedQty: number; varianceQty: number; unit: string; note: string }
+export interface StockCount {
+  countId: string;
+  countDate: string;
+  branchId: string;
+  locationId: string;
+  countRound: string;
+  countedBy: string;
+  countStatus: "DRAFT" | "COMPLETED";
+  note: string;
+  createdAt: string;
+  source: CountSource;
+  documentCode: string;
+  ocrStatus: CountOcrStatus;
+  originalImageUrl: string;
+  ocrConfidence: number;
+  printedAt: string;
+  uploadedAt: string;
+  reviewedBy: string;
+  reviewedAt: string;
+  completedBy: string;
+  completedAt: string;
+}
+export interface StockCountItem {
+  countItemId: string;
+  countId: string;
+  itemId: string;
+  systemQty: number;
+  countedQty: number | null;
+  varianceQty: number;
+  unit: string;
+  note: string;
+  rowNumber: number;
+  ocrRawValue: string;
+  ocrConfidence: number;
+  reviewStatus: CountInputStatus;
+  reviewedQty: number | null;
+}
 export interface UserActivity { activityId: string; activityDate: string; userId: string; branchId: string; action: string; entityType: string; entityId: string; result: string; detail: string; metadataJson: string; createdAt: string }
 export interface UserStats { userId: string; totalXp: number; currentLevel: number; currentLevelXp: number; nextLevelXp: number; currentStreak: number; longestStreak: number; lastActiveDate: string; lastXpAt: string; updatedAt: string }
 export interface XpTransaction { xpTransactionId: string; userId: string; activityId: string; xpAmount: number; reason: string; entityType: string; entityId: string; createdAt: string }
@@ -69,8 +107,8 @@ export const SHEET_HEADERS = {
   Stock_Movements: ["Movement_ID", "Movement_Date", "Branch_ID", "Item_ID", "Movement_Type", "From_Location_ID", "To_Location_ID", "Qty", "Unit", "Reference_Type", "Reference_ID", "Created_By", "Note", "Created_At"],
   Stock_Requests: ["Request_ID", "Request_Date", "Branch_ID", "Requested_By", "Request_Status", "Approved_By", "Completed_At", "Note", "Created_At"],
   Stock_Request_Items: ["Request_Item_ID", "Request_ID", "Item_ID", "Requested_Qty", "Approved_Qty", "Issued_Qty", "Unit", "Item_Status", "Note"],
-  Stock_Counts: ["Count_ID", "Count_Date", "Branch_ID", "Location_ID", "Count_Round", "Counted_By", "Count_Status", "Note", "Created_At"],
-  Stock_Count_Items: ["Count_Item_ID", "Count_ID", "Item_ID", "System_Qty", "Counted_Qty", "Variance_Qty", "Unit", "Note"],
+  Stock_Counts: ["Count_ID", "Count_Date", "Branch_ID", "Location_ID", "Count_Round", "Counted_By", "Count_Status", "Note", "Created_At", "Source", "Document_Code", "OCR_Status", "Original_Image_URL", "OCR_Confidence", "Printed_At", "Uploaded_At", "Reviewed_By", "Reviewed_At", "Completed_By", "Completed_At"],
+  Stock_Count_Items: ["Count_Item_ID", "Count_ID", "Item_ID", "System_Qty", "Counted_Qty", "Variance_Qty", "Unit", "Note", "Row_Number", "OCR_Raw_Value", "OCR_Confidence", "Review_Status", "Reviewed_Qty"],
   User_Activities: ["Activity_ID", "Activity_Date", "User_ID", "Branch_ID", "Action", "Entity_Type", "Entity_ID", "Result", "Detail", "Metadata_JSON", "Created_At"],
   User_Stats: ["User_ID", "Total_XP", "Current_Level", "Current_Level_XP", "Next_Level_XP", "Current_Streak", "Longest_Streak", "Last_Active_Date", "Last_XP_At", "Updated_At"],
   XP_Transactions: ["XP_Transaction_ID", "User_ID", "Activity_ID", "XP_Amount", "Reason", "Entity_Type", "Entity_ID", "Created_At"],

@@ -7,6 +7,20 @@ import { applyMovementToBalances, countVariance, requestStatus, validateMovement
 
 const now = () => new Date().toISOString();
 const today = () => now().slice(0, 10);
+const OCR_REVIEW_THRESHOLD = 0.8;
+
+type CountRound = "OPENING" | "MIDDAY" | "CLOSING" | "ADHOC";
+type PaperCountInput = {
+  locationId: string;
+  countRound: CountRound;
+  categoryId?: string;
+  requireDailyCountOnly?: boolean;
+  itemIds?: string[];
+  sortBy?: "CATEGORY" | "LOCATION";
+  note?: string;
+};
+type UploadedDocument = { fileName: string; mimeType: string; size: number; pageNumber: number; fingerprint?: string };
+type CountItemUpdate = { countItemId?: string; itemId?: string; rowNumber?: number; countedQty: number | null; note?: string; reviewStatus?: "UNREAD" | "OCR_RECOGNIZED" | "NEEDS_REVIEW" | "CONFIRMED" };
 
 export class InventoryService {
   constructor(private readonly repository: InventoryRepository) {}
@@ -196,8 +210,10 @@ export class InventoryService {
 
   async createCount(user: SessionUser, input: { locationId: string; countRound: string; status: "DRAFT" | "COMPLETED"; note?: string; items: Array<{ itemId: string; countedQty: number; unit: string; note?: string }> }) {
     const balances = await this.balances(user.branchId); const countId = createId("CNT");
-    const count: StockCount = { countId, countDate: today(), branchId: user.branchId, locationId: input.locationId, countRound: input.countRound, countedBy: user.userId, countStatus: input.status, note: input.note?.trim() ?? "", createdAt: now() };
-    const items: StockCountItem[] = input.items.map((v) => { const systemQty = balances.find((b) => b.locationId === input.locationId && b.itemId === v.itemId)?.currentQty ?? 0; return { countItemId: createId("CNTI"), countId, itemId: v.itemId, systemQty, countedQty: v.countedQty, varianceQty: countVariance(systemQty, v.countedQty), unit: v.unit, note: v.note?.trim() ?? "" }; });
+    const documentCode = await this.nextDocumentCode();
+    const timestamp = now();
+    const count: StockCount = { countId, countDate: today(), branchId: user.branchId, locationId: input.locationId, countRound: input.countRound, countedBy: user.userId, countStatus: input.status, note: input.note?.trim() ?? "", createdAt: timestamp, source: "WEB", documentCode, ocrStatus: "CONFIRMED", originalImageUrl: "", ocrConfidence: 0, printedAt: "", uploadedAt: "", reviewedBy: user.userId, reviewedAt: timestamp, completedBy: input.status === "COMPLETED" ? user.userId : "", completedAt: input.status === "COMPLETED" ? timestamp : "" };
+    const items: StockCountItem[] = input.items.map((v, index) => { const systemQty = balances.find((b) => b.locationId === input.locationId && b.itemId === v.itemId)?.currentQty ?? 0; return { countItemId: createId("CNTI"), countId, itemId: v.itemId, systemQty, countedQty: v.countedQty, varianceQty: countVariance(systemQty, v.countedQty), unit: v.unit, note: v.note?.trim() ?? "", rowNumber: index + 1, ocrRawValue: "", ocrConfidence: 0, reviewStatus: "CONFIRMED", reviewedQty: v.countedQty }; });
     await this.repository.append("Stock_Counts", [countRecord(count)]); await this.repository.append("Stock_Count_Items", items.map(countItemRecord));
     if (input.status === "COMPLETED") {
       const movements = items.filter((v) => v.varianceQty !== 0).map((v): StockMovement => ({ movementId: createId("MOV"), movementDate: today(), branchId: user.branchId, itemId: v.itemId, movementType: "ADJUSTMENT", fromLocationId: v.varianceQty < 0 ? input.locationId : "", toLocationId: v.varianceQty > 0 ? input.locationId : "", qty: Math.abs(v.varianceQty), unit: v.unit, referenceType: "COUNT", referenceId: countId, createdBy: user.userId, note: "ปรับยอดจากการนับสต๊อก", createdAt: now() }));
@@ -207,7 +223,130 @@ export class InventoryService {
     return { ...count, items };
   }
 
-  async counts(user: SessionUser) { const [counts, items] = await Promise.all([this.repository.read("Stock_Counts"), this.repository.read("Stock_Count_Items")]); return counts.map(mapCount).filter((v) => v.branchId === user.branchId).map((v) => ({ ...v, items: items.map(mapCountItem).filter((i) => i.countId === v.countId) })); }
+  async createPaperCount(user: SessionUser, input: PaperCountInput) {
+    const [locations, items, categories, storeItems, balances] = await Promise.all([this.locations(user.branchId), this.items(), this.categories(), this.storeItems(user.branchId), this.balances(user.branchId)]);
+    if (!locations.some((location) => location.locationId === input.locationId && location.isActive)) throw new AppError(400, "INVALID_LOCATION", "ตำแหน่งจัดเก็บไม่ถูกต้อง");
+    const selectedIds = new Set(input.itemIds?.filter(Boolean) ?? []);
+    const requireDaily = input.requireDailyCountOnly ?? false;
+    const candidates = storeItems.filter((setting) => setting.isActive && (!requireDaily || setting.requireDailyCount) && (!selectedIds.size || selectedIds.has(setting.itemId))).flatMap((setting) => {
+      const item = items.find((candidate) => candidate.itemId === setting.itemId && candidate.isActive);
+      if (!item || (input.categoryId && item.categoryId !== input.categoryId)) return [];
+      const category = categories.find((candidate) => candidate.categoryId === item.categoryId);
+      return [{ item, setting, categoryName: category?.categoryName ?? "" }];
+    });
+    if (!candidates.length) throw new AppError(400, "EMPTY_COUNT", "กรุณาเลือกรายการสินค้าที่ต้องการพิมพ์");
+    const sorted = candidates.sort((a, b) => input.sortBy === "LOCATION" ? a.setting.defaultLocationId.localeCompare(b.setting.defaultLocationId) || a.item.itemName.localeCompare(b.item.itemName) : a.categoryName.localeCompare(b.categoryName) || a.item.itemName.localeCompare(b.item.itemName));
+    const timestamp = now();
+    const countId = createId("CNT");
+    const documentCode = await this.nextDocumentCode();
+    const count: StockCount = { countId, countDate: today(), branchId: user.branchId, locationId: input.locationId, countRound: input.countRound, countedBy: user.userId, countStatus: "DRAFT", note: input.note?.trim() ?? "", createdAt: timestamp, source: "PAPER_OCR", documentCode, ocrStatus: "PENDING", originalImageUrl: "", ocrConfidence: 0, printedAt: timestamp, uploadedAt: "", reviewedBy: "", reviewedAt: "", completedBy: "", completedAt: "" };
+    const countItems: StockCountItem[] = sorted.map(({ item }, index) => {
+      const systemQty = balances.find((balance) => balance.locationId === input.locationId && balance.itemId === item.itemId)?.currentQty ?? 0;
+      return { countItemId: createId("CNTI"), countId, itemId: item.itemId, systemQty, countedQty: null, varianceQty: 0, unit: item.unit, note: "", rowNumber: index + 1, ocrRawValue: "", ocrConfidence: 0, reviewStatus: "UNREAD", reviewedQty: null };
+    });
+    await this.repository.append("Stock_Counts", [countRecord(count)]);
+    await this.repository.append("Stock_Count_Items", countItems.map(countItemRecord));
+    return this.countDetail(user, countId);
+  }
+
+  async processCountOcr(user: SessionUser, countId: string, files: UploadedDocument[]) {
+    if (!files.length) throw new AppError(400, "NO_UPLOAD_FILES", "กรุณาอัปโหลดไฟล์เอกสารอย่างน้อยหนึ่งไฟล์");
+    const detail = await this.countDetail(user, countId);
+    if (detail.countStatus === "COMPLETED") throw new AppError(409, "COUNT_ALREADY_COMPLETED", "รายการนี้ยืนยันผลนับแล้ว");
+    const fingerprints = new Set<string>();
+    for (const file of files) {
+      const mimeOk = ["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.mimeType);
+      if (!mimeOk || file.size <= 0 || file.size > 12 * 1024 * 1024) throw new AppError(400, "INVALID_UPLOAD_FILE", "รองรับ JPG, PNG, WebP หรือ PDF ขนาดไม่เกิน 12 MB");
+      const fingerprint = file.fingerprint || `${file.fileName}:${file.size}:${file.pageNumber}`;
+      if (fingerprints.has(fingerprint)) throw new AppError(409, "DUPLICATE_UPLOAD", "พบไฟล์ซ้ำในชุดอัปโหลดนี้");
+      fingerprints.add(fingerprint);
+    }
+    const processed = detail.items.map((item) => {
+      const unread = item.rowNumber % 5 === 0;
+      const lowConfidence = item.rowNumber % 3 === 0;
+      const rawValue = unread ? "" : String(item.rowNumber + (item.rowNumber % 2 ? 0.5 : 0));
+      const confidence = unread ? 0 : lowConfidence ? 0.58 : 0.92;
+      const countedQty = rawValue === "" ? null : Number(rawValue);
+      return { ...item, ocrRawValue: rawValue, ocrConfidence: confidence, countedQty, reviewedQty: null, reviewStatus: rawValue === "" ? "UNREAD" as const : confidence < OCR_REVIEW_THRESHOLD ? "NEEDS_REVIEW" as const : "OCR_RECOGNIZED" as const, varianceQty: countedQty === null ? 0 : countVariance(item.systemQty, countedQty) };
+    });
+    const average = processed.length ? processed.reduce((sum, item) => sum + item.ocrConfidence, 0) / processed.length : 0;
+    const count: StockCount = { ...detail, ocrStatus: "REVIEW", uploadedAt: now(), originalImageUrl: files.map((file) => sanitizeFileName(file.fileName)).join("; "), ocrConfidence: Number(average.toFixed(3)) };
+    await this.repository.upsert("Stock_Counts", "Count_ID", [countRecord(count)]);
+    await this.repository.upsert("Stock_Count_Items", "Count_Item_ID", processed.map(countItemRecord));
+    return this.countDetail(user, countId);
+  }
+
+  async updateCountItems(user: SessionUser, countId: string, updates: CountItemUpdate[], saveAsDraft = true) {
+    if (!updates.length) throw new AppError(400, "EMPTY_COUNT_ITEMS", "ไม่มีรายการให้อัปเดต");
+    const detail = await this.countDetail(user, countId);
+    if (detail.countStatus === "COMPLETED") throw new AppError(409, "COUNT_ALREADY_COMPLETED", "รายการนี้ยืนยันผลนับแล้ว");
+    const updatedItems = detail.items.map((item) => {
+      const update = updates.find((value) => value.countItemId === item.countItemId || value.itemId === item.itemId || value.rowNumber === item.rowNumber);
+      if (!update) return item;
+      if (update.countedQty !== null && (!Number.isFinite(update.countedQty) || update.countedQty < 0)) throw new AppError(400, "INVALID_COUNTED_QTY", "จำนวนที่นับได้ต้องไม่ติดลบ");
+      const reviewStatus = update.reviewStatus ?? (update.countedQty === null ? "UNREAD" : "CONFIRMED");
+      const countedQty = update.countedQty;
+      return { ...item, countedQty, reviewedQty: countedQty, varianceQty: countedQty === null ? 0 : countVariance(item.systemQty, countedQty), note: update.note?.trim() ?? item.note, reviewStatus };
+    });
+    const timestamp = now();
+    const allConfirmed = updatedItems.every((item) => item.reviewStatus === "CONFIRMED" && item.countedQty !== null);
+    const count: StockCount = { ...detail, ocrStatus: allConfirmed ? "CONFIRMED" : "REVIEW", reviewedBy: user.userId, reviewedAt: timestamp };
+    await this.repository.upsert("Stock_Count_Items", "Count_Item_ID", updatedItems.map(countItemRecord));
+    if (saveAsDraft) await this.repository.upsert("Stock_Counts", "Count_ID", [countRecord(count)]);
+    return { ...count, items: updatedItems };
+  }
+
+  async completeCount(user: SessionUser, countId: string) {
+    const detail = await this.countDetail(user, countId);
+    if (detail.countStatus === "COMPLETED") return detail;
+    if (detail.items.some((item) => item.reviewStatus !== "CONFIRMED" || item.countedQty === null)) throw new AppError(409, "COUNT_REVIEW_REQUIRED", "ต้องตรวจสอบและยืนยันครบทุกรายการก่อน Completed");
+    const existingMovements = (await this.repository.read("Stock_Movements", { fresh: true })).map(mapMovement).filter((movement) => movement.referenceType === "COUNT" && movement.referenceId === countId);
+    if (existingMovements.length) {
+      const completed = { ...detail, countStatus: "COMPLETED" as const, ocrStatus: "CONFIRMED" as const, completedBy: user.userId, completedAt: detail.completedAt || now() };
+      await this.repository.upsert("Stock_Counts", "Count_ID", [countRecord(completed)]);
+      return this.countDetail(user, countId);
+    }
+    const balances = await this.balances(user.branchId);
+    const completedAt = now();
+    const finalItems = detail.items.map((item) => ({ ...item, varianceQty: countVariance(item.systemQty, item.countedQty ?? 0), reviewedQty: item.countedQty }));
+    const movements = finalItems.filter((item) => item.varianceQty !== 0).map((item): StockMovement => ({ movementId: createId("MOV"), movementDate: today(), branchId: user.branchId, itemId: item.itemId, movementType: "ADJUSTMENT", fromLocationId: item.varianceQty < 0 ? detail.locationId : "", toLocationId: item.varianceQty > 0 ? detail.locationId : "", qty: Math.abs(item.varianceQty), unit: item.unit, referenceType: "COUNT", referenceId: countId, createdBy: user.userId, note: "ปรับยอดจากการนับสต๊อก", createdAt: completedAt }));
+    for (const movement of movements) applyMovementToBalances(balances, movement);
+    const completed: StockCount = { ...detail, countStatus: "COMPLETED", ocrStatus: "CONFIRMED", reviewedBy: detail.reviewedBy || user.userId, reviewedAt: detail.reviewedAt || completedAt, completedBy: user.userId, completedAt };
+    await this.repository.upsert("Stock_Count_Items", "Count_Item_ID", finalItems.map(countItemRecord));
+    if (movements.length) {
+      await this.repository.append("Stock_Movements", movements.map(movementRecord));
+      await this.repository.upsert("Stock_Balances", "Balance_ID", balances.map(balanceRecord));
+    }
+    await this.repository.upsert("Stock_Counts", "Count_ID", [countRecord(completed)]);
+    return this.countDetail(user, countId);
+  }
+
+  async counts(user: SessionUser) { const [counts, items] = await Promise.all([this.repository.read("Stock_Counts"), this.repository.read("Stock_Count_Items")]); return counts.map(mapCount).filter((v) => v.branchId === user.branchId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((v) => ({ ...v, items: items.map(mapCountItem).filter((i) => i.countId === v.countId) })); }
+
+  async countDetail(user: SessionUser, countId: string) {
+    const [counts, countItems, items, locations, branches, users, movements] = await Promise.all([this.repository.read("Stock_Counts"), this.repository.read("Stock_Count_Items"), this.items(), this.locations(user.branchId), this.branches(), this.repository.read("Users"), this.repository.read("Stock_Movements")]);
+    const count = counts.map(mapCount).find((value) => value.countId === countId || value.documentCode === countId);
+    if (!count || count.branchId !== user.branchId) throw new AppError(404, "COUNT_NOT_FOUND", "ไม่พบการนับสต๊อก");
+    const countUsers = users.map(mapUser);
+    return {
+      ...count,
+      branch: branches.find((branch) => branch.branchId === count.branchId),
+      location: locations.find((location) => location.locationId === count.locationId),
+      counter: countUsers.find((value) => value.userId === count.countedBy),
+      reviewer: countUsers.find((value) => value.userId === count.reviewedBy),
+      completer: countUsers.find((value) => value.userId === count.completedBy),
+      items: countItems.map(mapCountItem).filter((item) => item.countId === count.countId).sort((a, b) => a.rowNumber - b.rowNumber).map((item) => ({ ...item, item: items.find((candidate) => candidate.itemId === item.itemId) })),
+      movements: movements.map(mapMovement).filter((movement) => movement.referenceType === "COUNT" && movement.referenceId === count.countId),
+    };
+  }
+
+  private async nextDocumentCode(): Promise<string> {
+    const ymd = today().replaceAll("-", "");
+    const prefix = `CNT-${ymd}-`;
+    const existing = (await this.repository.read("Stock_Counts", { fresh: true })).map(mapCount).filter((count) => count.documentCode.startsWith(prefix) || count.countId.startsWith(prefix));
+    const next = existing.reduce((max, count) => Math.max(max, Number((count.documentCode || count.countId).slice(prefix.length)) || 0), 0) + 1;
+    return `${prefix}${String(next).padStart(3, "0")}`;
+  }
 
   async rebuildBalances(user: SessionUser): Promise<StockBalance[]> {
     if (user.role !== "owner") throw new AppError(403, "FORBIDDEN", "เฉพาะ owner เท่านั้น");
@@ -217,4 +356,8 @@ export class InventoryService {
     await this.repository.clearAndWrite("Stock_Balances", balances.map(balanceRecord));
     return balances;
   }
+}
+
+function sanitizeFileName(value: string): string {
+  return value.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120) || "uploaded-document";
 }

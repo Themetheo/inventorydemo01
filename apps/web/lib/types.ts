@@ -13,3 +13,49 @@ export interface StockRequest { requestId: string; requestDate: string; branchId
 export interface CreateRequestResult { requestId: string; status: "PENDING"; itemCount: number }
 export interface Movement { movementId: string; movementDate: string; branchId: string; itemId: string; movementType: string; fromLocationId: string; toLocationId: string; qty: number; unit: string; referenceType: string; referenceId: string; createdBy: string; note: string; createdAt: string }
 export interface DashboardSummary { pendingRequests: number; lowStockItems: number; dailyCountItems: number }
+export type CountInputStatus = "UNREAD" | "OCR_RECOGNIZED" | "NEEDS_REVIEW" | "CONFIRMED";
+export interface StockCountItem {
+  countItemId: string;
+  countId: string;
+  itemId: string;
+  systemQty: number;
+  countedQty: number | null;
+  varianceQty: number;
+  unit: string;
+  note: string;
+  rowNumber: number;
+  ocrRawValue: string;
+  ocrConfidence: number;
+  reviewStatus: CountInputStatus;
+  reviewedQty: number | null;
+  item?: Item;
+}
+export interface StockCount {
+  countId: string;
+  countDate: string;
+  branchId: string;
+  locationId: string;
+  countRound: string;
+  countedBy: string;
+  countStatus: "DRAFT" | "COMPLETED";
+  note: string;
+  createdAt: string;
+  source: "WEB" | "PAPER_OCR";
+  documentCode: string;
+  ocrStatus: "PENDING" | "PROCESSING" | "REVIEW" | "CONFIRMED" | "FAILED";
+  originalImageUrl: string;
+  ocrConfidence: number;
+  printedAt: string;
+  uploadedAt: string;
+  reviewedBy: string;
+  reviewedAt: string;
+  completedBy: string;
+  completedAt: string;
+  items?: StockCountItem[];
+  location?: Location;
+  branch?: Branch;
+  counter?: UserSummary;
+  reviewer?: UserSummary;
+  completer?: UserSummary;
+  movements?: Movement[];
+}

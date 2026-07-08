@@ -1,7 +1,7 @@
 # Current State
 
-- Updated: 2026-07-07
-- Verified commit: `713ce1bb9c759fe697d673e3a6345f25da7553d8` plus the current item-upload working tree
+- Updated: 2026-07-08
+- Verified commit: `e43280f3eca0011bd04c664d58fac815c1a4f3f4` plus the current paper stock-count OCR working tree
 - Architecture baseline: `docs/inventory-mvp.md`
 - Evidence: current routes/imports, `InventoryService`, repository contract/adapter, sheet header definitions, and targeted Git history through the commit above.
 
@@ -18,6 +18,7 @@
 - Request list/detail, cancel, approve, reject, issue, partial issue, and quick issue are implemented.
 - Issuing a request creates TRANSFER movements and updates balances and request status.
 - Stock count supports DRAFT and COMPLETED; completion creates ADJUSTMENT movements for variances.
+- Paper stock count under `/inventory/count` supports A4 print forms, daily-count filtering, document codes, row numbers, print CSS, scan upload UI, mock OCR processing, human review, draft save, detail/history views, and backend-only completion.
 - Owner-only balance rebuild exists in the API.
 - Google Sheets access is isolated behind `InventoryRepository`; master tabs use a 45-second in-memory cache invalidated after writes.
 - Focused unit/integration tests exist for API routes, rules, repository behavior, mappers, sheet utilities, web workflow helpers, and feature components.
@@ -25,9 +26,9 @@
 ## Partial or not exposed end-to-end
 
 - User activity/XP/KPI types, sheet headers, repository methods, and service code exist, but no activity routes are registered in the current `apps/api/src/app.ts`; treat this capability as partial.
-- The web stock-count page creates counts but does not expose the API count list/detail as a history/detail workflow.
+- Paper OCR uses a mock backend adapter that reads document/row metadata only; a real OCR provider still needs to replace the mock provider contract before production use.
 - Dashboard reports pending requests, low stock, and daily-count totals; it does not create replenishment orders automatically.
-- The architecture document describes 12 inventory tabs, while `apps/api/src/models.ts` currently declares 16 tabs after adding four activity/XP/KPI tabs. This documentation/schema expectation drift must be reconciled before relying on a full schema check.
+- `Stock_Counts` and `Stock_Count_Items` now require additional trailing OCR/review columns; live Sheets must be migrated before schema checks pass against older spreadsheets.
 
 ## Known issues and technical limitations
 
@@ -36,8 +37,10 @@
 - Legacy plaintext passwords remain supported; full Argon2id migration is incomplete.
 - Process restart clears the in-memory cache.
 - Balance correctness depends on movement writes and projection updates staying synchronized; rebuild is restricted to owner.
+- Paper count completion checks for existing COUNT movements before creating adjustments, but Google Sheets still cannot provide a true transaction or row lock for concurrent completions.
 - External Sheets verification requires configured credentials and access to the live spreadsheet; local unit tests do not prove live schema/data correctness.
 - Uploaded item images are stored on the web process filesystem under `apps/web/public/images/items/`; persistence therefore depends on the deployment filesystem. Clearing or replacing an image does not delete the old file in this phase.
+- Paper count upload in this phase stores uploaded file names as metadata; scanned images/PDFs are previewed in the browser and are not persisted to durable storage.
 - Codespaces public web access currently uses port `3001`; port `3000` returned a tunnel-level `502` even while local Next.js responded. Start the web dev server with `-H 0.0.0.0 -p 3001` and set `NEXT_PUBLIC_API_BASE_URL` to the public API URL on port `4000` when exposing the app externally.
 
 ## Current priorities
@@ -47,5 +50,5 @@ No explicit roadmap file exists. Based on current implementation gaps, prioritiz
 1. Reconcile the 12-tab architecture documentation with the 16-tab header set and complete or remove the partial activity surface deliberately.
 2. Protect movement/balance/request writes against concurrency and partial failures; preserve idempotency.
 3. Migrate remaining plaintext passwords to Argon2id.
-4. Add stock-count history/detail UX if operational review is required.
+4. Replace mock paper-count OCR with a real provider behind the backend adapter and add durable upload storage if scanned files must be retained.
 5. Keep item/store-item synchronization and invalidation covered by focused tests.

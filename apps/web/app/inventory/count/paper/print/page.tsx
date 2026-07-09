@@ -6,10 +6,8 @@ import { Suspense, useEffect } from "react";
 import { StockCountPrintableDocument } from "@/components/documents/stock-count-printable-document";
 import { ErrorBox } from "@/components/page-kit";
 import { get } from "@/lib/api";
-import { paginateCountItems } from "@/lib/stock-count-paper";
+import { paginateCountItemsForPrint } from "@/lib/stock-count-paper";
 import type { StockCount } from "@/lib/types";
-
-const PRINT_ROWS_PER_PAGE = 18;
 
 export default function PaperCountPrintPage() {
   return <Suspense fallback={<PrintState text="กำลังเตรียมเอกสาร..." />}>
@@ -25,7 +23,7 @@ function PaperCountPrintContent() {
     queryFn: () => get<StockCount>(`/stock-counts/${countId}`),
     enabled: Boolean(countId),
   });
-  const pages = count.data?.items ? paginateCountItems(count.data.items, PRINT_ROWS_PER_PAGE) : [];
+  const pages = count.data?.items ? paginateCountItemsForPrint(count.data.items) : [];
 
   useEffect(() => {
     if (!count.data?.items?.length) return;

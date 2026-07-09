@@ -26,16 +26,18 @@ export function StockCountPrintableDocument({ count, pages, className = "" }: { 
                 { label: "หน้า", value: `${pageIndex + 1}/${pages.length}` },
               ]}
             />
-            <StockCountDocumentTable items={pageItems} />
+            <div className="document-content">
+              <StockCountDocumentTable items={pageItems} />
+            </div>
             {pageIndex === pages.length - 1 && (
-              <>
+              <section className="final-section">
                 <DocumentFooter note={count.note || "กรอกจำนวนจริงในช่องจำนวนที่นับได้ ห้ามคัดลอกยอดคงเหลือจากระบบลงเอกสาร"} />
                 <DocumentSignatures slots={[
                   { label: "ผู้ตรวจนับ", name: "" },
                   { label: "ผู้ทวนสอบ", name: "" },
                   { label: "ผู้บันทึกผล", name: "" },
                 ]} />
-              </>
+              </section>
             )}
           </DocumentPaper>
         ))}

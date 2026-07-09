@@ -1,6 +1,7 @@
 import type { StockCount, StockCountItem } from "./types";
 
 export const PAPER_ROWS_PER_PAGE = 18;
+export const PAPER_ROWS_PER_FINAL_PAGE = 12;
 export const STOCK_COUNT_UPLOAD_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
 export const STOCK_COUNT_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
 
@@ -9,6 +10,22 @@ export function paginateCountItems(items: StockCountItem[], rowsPerPage = PAPER_
   const pages: StockCountItem[][] = [];
   for (let index = 0; index < items.length; index += rowsPerPage) pages.push(items.slice(index, index + rowsPerPage));
   return pages.length ? pages : [[]];
+}
+
+export function paginateCountItemsForPrint(items: StockCountItem[], rowsPerNormalPage = PAPER_ROWS_PER_PAGE, rowsPerFinalPage = PAPER_ROWS_PER_FINAL_PAGE): StockCountItem[][] {
+  if (rowsPerNormalPage < 1 || rowsPerFinalPage < 1) throw new Error("rows per page must be positive");
+  if (!items.length) return [[]];
+  if (items.length <= rowsPerFinalPage) return [items];
+
+  const pages: StockCountItem[][] = [];
+  let remaining = items;
+  while (remaining.length > rowsPerFinalPage) {
+    const rowsForThisPage = remaining.length - rowsPerNormalPage <= rowsPerFinalPage ? remaining.length - rowsPerFinalPage : rowsPerNormalPage;
+    pages.push(remaining.slice(0, rowsForThisPage));
+    remaining = remaining.slice(rowsForThisPage);
+  }
+  pages.push(remaining);
+  return pages;
 }
 
 export function formatThaiShortDate(value: string): string {

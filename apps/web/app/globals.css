@@ -1408,10 +1408,22 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
 }
 
 .stock-count-print-document .print-page {
+  display: flex;
+  flex-direction: column;
   width: 190mm;
   min-height: 277mm;
   padding: 0;
   overflow: visible;
+}
+
+.stock-count-print-document .document-content {
+  flex: 1 1 auto;
+}
+
+.stock-count-print-document .final-section {
+  margin-top: auto;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .stock-count-print-document .document-header {
@@ -1501,13 +1513,13 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 8mm !important;
-  margin-top: 18mm !important;
+  margin-top: 14mm !important;
   break-inside: avoid;
   page-break-inside: avoid;
 }
 
 .stock-count-print-document .signature-box {
-  min-height: 28mm;
+  min-height: 24mm;
   text-align: center !important;
 }
 
@@ -1787,7 +1799,8 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
 
   .print-page,
   .stock-count-print-document .print-page {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
     width: 190mm !important;
     max-width: none !important;
     min-height: 277mm !important;
@@ -1814,6 +1827,16 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     gap: 10mm !important;
   }
 
+  .stock-count-print-document .document-content {
+    flex: 1 1 auto !important;
+  }
+
+  .stock-count-print-document .final-section {
+    margin-top: auto !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
   .stock-count-print-document .document-brand__logo {
     display: none !important;
   }
@@ -1827,13 +1850,13 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 8mm !important;
-    margin-top: 18mm !important;
+    margin-top: 14mm !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
 
   .stock-count-print-document .signature-box {
-    min-height: 28mm !important;
+    min-height: 24mm !important;
     text-align: center !important;
   }
 

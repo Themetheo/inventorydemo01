@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countReviewSummary, formatThaiShortDate, isCountCompletable, paginateCountItems, validateStockCountUpload } from "./stock-count-paper";
+import { countReviewSummary, formatThaiShortDate, isCountCompletable, paginateCountItems, paginateCountItemsForPrint, validateStockCountUpload } from "./stock-count-paper";
 import type { StockCountItem } from "./types";
 
 const item = (rowNumber: number, status: StockCountItem["reviewStatus"], countedQty: number | null, extra: Partial<StockCountItem> = {}): StockCountItem => ({
@@ -25,6 +25,13 @@ describe("stock count paper helpers", () => {
     const pages = paginateCountItems(rows, 18);
     expect(pages.map((page) => page.length)).toEqual([18, 18, 1]);
     expect(pages[1][0].rowNumber).toBe(19);
+  });
+
+  it("reserves final-page space for paper notes and signatures", () => {
+    const rows = Array.from({ length: 70 }, (_, index) => item(index + 1, "UNREAD", null));
+    const pages = paginateCountItemsForPrint(rows, 18, 12);
+    expect(pages.map((page) => page.length)).toEqual([18, 18, 18, 4, 12]);
+    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(59);
   });
 
   it("formats short Thai Buddhist dates for printed forms", () => {

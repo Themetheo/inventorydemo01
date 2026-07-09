@@ -8,10 +8,9 @@ import { EmptyState, ErrorBox, FormField, GameButton, GamePanel, PageHeader, Sta
 import { get, post } from "@/lib/api";
 import { lockBodyScroll } from "@/lib/body-scroll-lock";
 import { filterValidItems } from "@/lib/items";
-import { paginateCountItems } from "@/lib/stock-count-paper";
+import { paginateCountItemsForPrint } from "@/lib/stock-count-paper";
 import type { Category, Item, Location, SessionUser, StockCount, StoreItem } from "@/lib/types";
 
-const PRINT_ROWS_PER_PAGE = 18;
 const A4_PREVIEW_WIDTH_PX = 718;
 const A4_PREVIEW_HEIGHT_PX = 1047;
 const preferredCategoryNames = ["วัตถุดิบ", "เครื่องปรุง", "บรรจุภัณฑ์", "เครื่องดื่ม", "เชื้อเพลิง", "ของใช้สิ้นเปลือง"];
@@ -98,7 +97,7 @@ export default function PaperCountPage() {
   });
   const selectAll = () => setSelected(new Set(selectableItems.map((item) => item.itemId)));
   const clearSelected = () => setSelected(new Set());
-  const pages = created?.items ? paginateCountItems(created.items, PRINT_ROWS_PER_PAGE) : [];
+  const pages = created?.items ? paginateCountItemsForPrint(created.items) : [];
   const printHref = created ? `/inventory/count/paper/print?id=${encodeURIComponent(created.countId)}` : "";
   const printDocument = () => {
     if (!created) return;

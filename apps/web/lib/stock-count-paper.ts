@@ -1,7 +1,7 @@
 import type { StockCount, StockCountItem } from "./types";
 
 export const PAPER_ROWS_PER_PAGE = 18;
-export const PAPER_ROWS_PER_FINAL_PAGE = 12;
+export const PAPER_ROWS_PER_FINAL_PAGE = 16;
 export const STOCK_COUNT_UPLOAD_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
 export const STOCK_COUNT_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
 

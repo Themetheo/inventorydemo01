@@ -247,37 +247,6 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
 .game-error-box__eyebrow { color: var(--color-game-danger); font-family: ui-monospace, monospace; font-size: .625rem; font-weight: 900; letter-spacing: .16em; }
 .game-error-box__message { margin-top: .25rem; font-size: .875rem; font-weight: 900; }
 
-.stock-count-print-page {
-  width: 210mm;
-  min-height: 297mm;
-  margin: 0 auto 18px;
-  background: #fff;
-  color: #111;
-  padding: 12mm;
-  box-shadow: 0 10px 30px rgba(61, 40, 27, .16);
-}
-.stock-count-print-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 2px solid #333; padding-bottom: 8px; }
-.stock-count-print-store { margin: 0; font-size: 12px; font-weight: 700; color: #444; }
-.stock-count-print-header h2 { margin: 2px 0 4px; font-size: 26px; line-height: 1.15; }
-.stock-count-print-header p { margin: 0; font-size: 12px; }
-.stock-count-barcode { display: grid; min-width: 132px; justify-items: center; gap: 4px; }
-.stock-count-barcode > span { display: inline-block; height: 42px; margin-right: 1px; background: #111; vertical-align: top; }
-.stock-count-barcode small { display: block; font-family: ui-monospace, monospace; font-size: 8px; color: #333; }
-.stock-count-print-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 12px; margin: 8px 0 10px; font-size: 11px; }
-.stock-count-print-meta div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px; border-bottom: 1px solid #999; min-height: 22px; }
-.stock-count-print-meta dt { color: #444; font-weight: 700; }
-.stock-count-print-meta dd { margin: 0; font-weight: 700; }
-.stock-count-signature { min-height: 18px; }
-.stock-count-print-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.stock-count-print-table th,
-.stock-count-print-table td { border: 1px solid #555; padding: 5px 6px; vertical-align: middle; }
-.stock-count-print-table th { background: #eee; color: #111; font-weight: 800; text-align: left; }
-.stock-count-print-table tr { break-inside: avoid; page-break-inside: avoid; }
-.stock-count-print-table .muted { color: #555; font-size: 10px; }
-.stock-count-print-table .item-name { width: 38%; font-size: 12px; font-weight: 800; }
-.stock-count-print-table .write-cell { width: 25mm; height: 13mm; background: #fff; }
-.stock-count-print-table .note-cell { width: 32mm; }
-
 .login-scene {
   display: flex;
   min-height: 100svh;
@@ -286,30 +255,6 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   background: #f6dda8;
   padding: 28px 32px;
   color: var(--color-game-ink);
-}
-
-@media print {
-  @page { size: A4 portrait; margin: 10mm; }
-  html,
-  body { background: #fff !important; }
-  .market-sidebar,
-  .market-profile,
-  .market-mobile-nav,
-  .screen-only { display: none !important; }
-  .app-market,
-  .market-main-frame,
-  .market-workspace { display: block !important; max-width: none !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; background: #fff !important; }
-  .print-preview { margin: 0 !important; }
-  .stock-count-print-page {
-    width: 210mm;
-    min-height: 297mm;
-    margin: 0;
-    padding: 10mm;
-    box-shadow: none;
-    break-after: page;
-    page-break-after: always;
-  }
-  .stock-count-print-page:last-child { break-after: auto; page-break-after: auto; }
 }
 
 .login-layout {
@@ -1682,14 +1627,19 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   }
 
   .no-print,
+  .screen-only,
   .floating-button,
   .selection-indicator,
   .page-indicator,
+  .focus-ring,
+  .cursor-indicator,
   input,
   select,
   textarea,
   button,
   [role="button"],
+  [role="checkbox"],
+  [role="radio"],
   .app-shell,
   .sidebar,
   .topbar,
@@ -1698,6 +1648,9 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   .modal-footer,
   .preview-modal,
   .preview-overlay,
+  .preview-header,
+  .preview-toolbar,
+  .preview-footer,
   .debug-ui,
   body:has(.document-system) .market-sidebar,
   body:has(.document-system) .market-profile,
@@ -1706,6 +1659,7 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   body:has(.document-system) .preview-modal header,
   body:has(.document-system) .preview-modal footer {
     display: none !important;
+    visibility: hidden !important;
   }
 
   input[type="checkbox"],
@@ -1723,6 +1677,10 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   .selection-indicator::after,
   .page-indicator::before,
   .page-indicator::after,
+  .focus-ring::before,
+  .focus-ring::after,
+  .cursor-indicator::before,
+  .cursor-indicator::after,
   input[type="checkbox"]::before,
   input[type="checkbox"]::after,
   input[type="radio"]::before,
@@ -1730,7 +1688,11 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   button::before,
   button::after,
   [role="button"]::before,
-  [role="button"]::after {
+  [role="button"]::after,
+  [role="checkbox"]::before,
+  [role="checkbox"]::after,
+  [role="radio"]::before,
+  [role="radio"]::after {
     display: none !important;
     content: none !important;
   }
@@ -1741,6 +1703,15 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   body:has(.print-only-document) .selection-indicator,
   body:has(.print-only-document) .page-indicator {
     display: none !important;
+  }
+
+  body:has(.print-root) * {
+    visibility: hidden !important;
+  }
+
+  .print-root,
+  .print-root * {
+    visibility: visible !important;
   }
 
   body:has(.document-system) .app-market,
@@ -1784,6 +1755,7 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     transform: none !important;
   }
 
+  .document-sheet,
   .print-root .document-sheet,
   .stock-count-print-document .document-sheet {
     display: block !important;
@@ -1797,6 +1769,7 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     transform: none !important;
   }
 
+  .document-paper,
   .print-page,
   .stock-count-print-document .print-page {
     display: flex !important;
@@ -1813,6 +1786,7 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     page-break-after: always;
   }
 
+  .document-paper:last-child,
   .print-page:last-child,
   .stock-count-print-document .print-page:last-child {
     break-after: auto;
@@ -1831,6 +1805,9 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     flex: 1 1 auto !important;
   }
 
+  .final-section,
+  .document-signatures,
+  .signature-section,
   .stock-count-print-document .final-section {
     margin-top: auto !important;
     break-inside: avoid !important;
@@ -1846,6 +1823,8 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     display: grid !important;
   }
 
+  .document-signatures,
+  .signature-section,
   .stock-count-print-document .signature-section {
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;

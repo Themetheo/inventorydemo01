@@ -330,8 +330,26 @@ function PreviewModal({ count, pages, onClose, onPrint }: { count: StockCount; p
         </div>
       </div>
       <div ref={bodyRef} className="preview-body document-preview-body min-h-0 flex-1 overflow-auto">
-        <div className="preview-canvas document-preview-stage" style={{ minHeight: A4_PREVIEW_HEIGHT_PX * Math.max(pages.length, 1) * scale + 48 }}>
-          <div className="preview-page-wrapper document-preview-scaled" style={{ width: A4_PREVIEW_WIDTH_PX, transform: `scale(${scale})` }}>
+        <div
+          className="preview-canvas document-preview-stage"
+          style={{
+            minHeight: A4_PREVIEW_HEIGHT_PX * Math.max(pages.length, 1) * scale + 96,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+            padding: 32,
+          }}
+        >
+          <div
+            className="preview-page-wrapper document-preview-scaled"
+            style={{
+              width: A4_PREVIEW_WIDTH_PX,
+              transform: `scale(${scale})`,
+              transformOrigin: "top center",
+              background: "white",
+              boxShadow: "0 12px 28px rgba(0,0,0,.18)",
+            }}
+          >
             <StockCountPrintableDocument count={count} pages={pages} className="stock-count-print-document stock-count-preview-document" />
           </div>
         </div>

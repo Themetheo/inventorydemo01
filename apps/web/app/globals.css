@@ -1626,6 +1626,10 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     print-color-adjust: exact;
   }
 
+  body * {
+    visibility: hidden !important;
+  }
+
   .no-print,
   .screen-only,
   .floating-button,
@@ -1687,6 +1691,10 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   input[type="radio"]::after,
   button::before,
   button::after,
+  .print-root::before,
+  .print-root::after,
+  .document-paper::before,
+  .document-paper::after,
   [role="button"]::before,
   [role="button"]::after,
   [role="checkbox"]::before,
@@ -1703,10 +1711,6 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   body:has(.print-only-document) .selection-indicator,
   body:has(.print-only-document) .page-indicator {
     display: none !important;
-  }
-
-  body:has(.print-root) * {
-    visibility: hidden !important;
   }
 
   .print-root,
@@ -1746,6 +1750,10 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   .print-root,
   .stock-count-print-document.print-root {
     display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
     width: 190mm !important;
     max-width: none !important;
     margin: 0 auto !important;

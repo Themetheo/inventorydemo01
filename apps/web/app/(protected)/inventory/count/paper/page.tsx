@@ -11,8 +11,8 @@ import { filterValidItems } from "@/lib/items";
 import { paginateCountItemsForPrint } from "@/lib/stock-count-paper";
 import type { Category, Item, Location, SessionUser, StockCount, StoreItem } from "@/lib/types";
 
-const A4_PREVIEW_WIDTH_PX = 718;
-const A4_PREVIEW_HEIGHT_PX = 1047;
+const A4_PREVIEW_WIDTH_PX = 794;
+const A4_PREVIEW_HEIGHT_PX = 1123;
 const preferredCategoryNames = ["วัตถุดิบ", "เครื่องปรุง", "บรรจุภัณฑ์", "เครื่องดื่ม", "เชื้อเพลิง", "ของใช้สิ้นเปลือง"];
 
 type SelectablePaperItem = Item & {
@@ -308,8 +308,8 @@ function PreviewModal({ count, pages, onClose, onPrint }: { count: StockCount; p
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  const fitWidthScale = viewport.width ? Math.min(Math.max((viewport.width - 48) / A4_PREVIEW_WIDTH_PX, 0.5), 1.5) : 0.8;
-  const fitPageScale = viewport.width && viewport.height ? Math.min(Math.max((viewport.width - 48) / A4_PREVIEW_WIDTH_PX, 0.5), Math.max((viewport.height - 48) / A4_PREVIEW_HEIGHT_PX, 0.5), 1.5) : 0.7;
+  const fitWidthScale = viewport.width ? Math.min(Math.max((viewport.width - 64) / A4_PREVIEW_WIDTH_PX, 0.5), 1.5) : 0.8;
+  const fitPageScale = viewport.width && viewport.height ? Math.min(Math.max((viewport.width - 64) / A4_PREVIEW_WIDTH_PX, 0.5), Math.max((viewport.height - 64) / A4_PREVIEW_HEIGHT_PX, 0.5), 1.5) : 0.7;
   const scale = zoomMode === "FIT_WIDTH" ? fitWidthScale : zoomMode === "FIT_PAGE" ? fitPageScale : customScale;
   const setActualSize = () => {
     setZoomMode("CUSTOM");
@@ -360,6 +360,7 @@ function PreviewModal({ count, pages, onClose, onPrint }: { count: StockCount; p
               transformOrigin: "top center",
               background: "white",
               boxShadow: "0 12px 28px rgba(0,0,0,.18)",
+              overflow: "visible",
             }}
           >
             <StockCountPrintableDocument count={count} pages={pages} className="stock-count-print-document stock-count-preview-document" />

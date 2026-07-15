@@ -7,6 +7,7 @@ type NamedItem = NonNullable<StockRequestItem["item"]> & {
 };
 
 const thaiShortMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const thaiFullMonths = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 
 export const statusText: Record<string, string> = {
   DRAFT: "แบบร่าง",
@@ -24,6 +25,13 @@ export function formatThaiDate(value: string | undefined | null) {
   if (Number.isNaN(date.getTime())) return value;
   const thaiYear = String(date.getFullYear() + 543).slice(-2);
   return `${date.getDate()} ${thaiShortMonths[date.getMonth()]} ${thaiYear}`;
+}
+
+export function formatThaiFullDate(value: string | undefined | null) {
+  if (!value?.trim()) return "ไม่พบวันที่";
+  const date = new Date(`${value.trim()}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getDate()} ${thaiFullMonths[date.getMonth()]} พ.ศ. ${date.getFullYear() + 543}`;
 }
 
 export function displayRequestNumber(request: Pick<StockRequest, "requestDate" | "createdAt" | "requestId">) {

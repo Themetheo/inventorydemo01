@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countReviewSummary, formatThaiShortDate, isCountCompletable, paginateCountItems, paginateCountItemsForPrint, validateStockCountUpload } from "./stock-count-paper";
+import { countReviewSummary, formatThaiShortDate, getPreviewCanvasHeight, isCountCompletable, paginateCountItems, paginateCountItemsForPrint, validateStockCountUpload } from "./stock-count-paper";
 import type { StockCountItem } from "./types";
 
 const item = (rowNumber: number, status: StockCountItem["reviewStatus"], countedQty: number | null, extra: Partial<StockCountItem> = {}): StockCountItem => ({
@@ -28,10 +28,24 @@ describe("stock count paper helpers", () => {
   });
 
   it("reserves final-page space for paper notes and signatures", () => {
+    const rows = Array.from({ length: 25 }, (_, index) => item(index + 1, "UNREAD", null));
+    const pages = paginateCountItemsForPrint(rows);
+    expect(pages.map((page) => page.length)).toEqual([14, 6, 5]);
+    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(21);
+  });
+
+  it("uses the extra normal-page room before moving rows to the final signature page", () => {
+    const rows = Array.from({ length: 18 }, (_, index) => item(index + 1, "UNREAD", null));
+    const pages = paginateCountItemsForPrint(rows);
+    expect(pages.map((page) => page.length)).toEqual([14, 4]);
+    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(15);
+  });
+
+  it("keeps long print documents on the same pagination as the web preview", () => {
     const rows = Array.from({ length: 70 }, (_, index) => item(index + 1, "UNREAD", null));
-    const pages = paginateCountItemsForPrint(rows, 18, 16);
-    expect(pages.map((page) => page.length)).toEqual([18, 18, 18, 16]);
-    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(55);
+    const pages = paginateCountItemsForPrint(rows);
+    expect(pages.map((page) => page.length)).toEqual([14, 14, 14, 14, 7, 7]);
+    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(64);
   });
 
   it("formats short Thai Buddhist dates for printed forms", () => {
@@ -61,5 +75,9 @@ describe("stock count paper helpers", () => {
     if (first.ok) seen.add(first.fingerprint);
     expect(validateStockCountUpload({ name: "scan.jpg", type: "image/jpeg", size: 1000 } as File, seen)).toMatchObject({ ok: false, code: "DUPLICATE_UPLOAD" });
     expect(validateStockCountUpload({ name: "scan.txt", type: "text/plain", size: 1000 } as File, new Set())).toMatchObject({ ok: false, code: "INVALID_TYPE" });
+  });
+
+  it("keeps preview canvas height based on full document height so scroll remains available", () => {
+    expect(getPreviewCanvasHeight(2)).toBe(1123 * 2 + 96);
   });
 });

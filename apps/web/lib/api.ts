@@ -8,7 +8,8 @@ function requestTarget(path: string) {
 
 function logRequestFailure(details: Record<string, unknown>) {
   // Do not log request headers, payloads, cookies, or response bodies here.
-  console.error("[api] Request failed", details);
+  // Keep handled request failures out of the Next.js dev error overlay.
+  console.warn("[api] Request failed", details);
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {

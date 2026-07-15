@@ -1,9 +1,15 @@
 import type { StockCount, StockCountItem } from "./types";
 
-export const PAPER_ROWS_PER_PAGE = 18;
-export const PAPER_ROWS_PER_FINAL_PAGE = 16;
+export const PAPER_ROWS_PER_PAGE = 14;
+export const PAPER_ROWS_PER_FINAL_PAGE = 10;
 export const STOCK_COUNT_UPLOAD_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
 export const STOCK_COUNT_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
+export const PREVIEW_PAGE_HEIGHT_PX = 1123;
+export const PREVIEW_CANVAS_PADDING_PX = 96;
+
+export function getPreviewCanvasHeight(pageCount: number) {
+  return PREVIEW_PAGE_HEIGHT_PX * Math.max(pageCount, 1) + PREVIEW_CANVAS_PADDING_PX;
+}
 
 export function paginateCountItems(items: StockCountItem[], rowsPerPage = PAPER_ROWS_PER_PAGE): StockCountItem[][] {
   if (rowsPerPage < 1) throw new Error("rowsPerPage must be positive");
@@ -18,13 +24,23 @@ export function paginateCountItemsForPrint(items: StockCountItem[], rowsPerNorma
   if (items.length <= rowsPerFinalPage) return [items];
 
   const pages: StockCountItem[][] = [];
-  let remaining = items;
-  while (remaining.length > rowsPerFinalPage) {
-    const rowsForThisPage = remaining.length - rowsPerNormalPage <= rowsPerFinalPage ? remaining.length - rowsPerFinalPage : rowsPerNormalPage;
-    pages.push(remaining.slice(0, rowsForThisPage));
-    remaining = remaining.slice(rowsForThisPage);
+  let index = 0;
+  let remainingCount = items.length;
+
+  while (remainingCount > rowsPerNormalPage) {
+    pages.push(items.slice(index, index + rowsPerNormalPage));
+    index += rowsPerNormalPage;
+    remainingCount -= rowsPerNormalPage;
   }
-  pages.push(remaining);
+
+  if (remainingCount <= rowsPerFinalPage) {
+    pages.push(items.slice(index));
+    return pages;
+  }
+
+  const firstTailCount = Math.ceil(remainingCount / 2);
+  pages.push(items.slice(index, index + firstTailCount));
+  pages.push(items.slice(index + firstTailCount));
   return pages;
 }
 

@@ -1,9 +1,38 @@
 import type { StockCountItem } from "@/lib/types";
 
-export function StockCountDocumentTable({ items }: { items: StockCountItem[] }) {
+function displayUnit(unit: string | undefined, normalizeUnits: boolean) {
+  if (!unit || !normalizeUnits) return unit ?? "";
+  const normalized = unit.trim().toLowerCase();
+  const unitMap: Record<string, string> = {
+    kg: "กก.",
+    kgs: "กก.",
+    kilogram: "กก.",
+    kilograms: "กก.",
+    oz: "ออนซ์",
+    ounce: "ออนซ์",
+    ounces: "ออนซ์",
+  };
+  return unitMap[normalized] ?? unit;
+}
+
+export function StockCountDocumentTable({
+  items,
+  minRows = 10,
+  normalizeUnits = false,
+  showEndRow = false,
+}: {
+  items: StockCountItem[];
+  minRows?: number;
+  normalizeUnits?: boolean;
+  showEndRow?: boolean;
+}) {
   if (!items.length) {
     return <div className="document-empty-items">ไม่มีรายการสินค้า</div>;
   }
+
+  const rows: Array<StockCountItem | null> = showEndRow
+    ? items
+    : [...items, ...Array.from({ length: Math.max(0, minRows - items.length) }, () => null)];
 
   return (
     <div className="document-table-wrap">
@@ -27,18 +56,23 @@ export function StockCountDocumentTable({ items }: { items: StockCountItem[] }) 
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
-            <tr key={item.countItemId || `${item.itemId}-${item.rowNumber}`}>
-              <td className="document-table__center">{item.rowNumber}</td>
-              <td className="document-table__item-code code-cell">{item.itemId || "ไม่พบรหัส"}</td>
+          {rows.map((item, index) => (
+            <tr className={item ? undefined : "document-table__empty-row"} key={item?.countItemId || (item ? `${item.itemId}-${item.rowNumber}` : `empty-row-${index}`)}>
+              <td className="document-table__center">{item?.rowNumber ?? ""}</td>
+              <td className="document-table__item-code code-cell">{item?.itemId ?? ""}</td>
               <td className="document-table__name name-cell">
-                <span className="document-table__item-name">{item.item?.itemName || item.itemId || "ไม่พบชื่อสินค้า"}</span>
+                {item && <span className="document-table__item-name">{item.item?.itemName || item.itemId || "ไม่พบชื่อสินค้า"}</span>}
               </td>
-              <td className="document-table__center">{item.unit || "-"}</td>
-              <td className="document-table__count-write-cell" aria-label={`จำนวนที่นับได้ ${item.item?.itemName ?? item.itemId}`} />
+              <td className="document-table__center">{displayUnit(item?.unit, normalizeUnits)}</td>
+              <td className="document-table__count-write-cell" aria-label={item ? `จำนวนที่นับได้ ${item.item?.itemName ?? item.itemId}` : undefined} />
               <td className="document-table__note" />
             </tr>
           ))}
+          {showEndRow && (
+            <tr className="document-table__end-row">
+              <td colSpan={6}>— สิ้นสุดรายการ —</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

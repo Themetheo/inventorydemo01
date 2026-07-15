@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StockCountPrintableDocument, roundLabel, stockCountRounds } from "@/components/documents/stock-count-printable-document";
 import { EmptyState, ErrorBox, FormField, GameButton, GamePanel, PageHeader, StatusBadge } from "@/components/page-kit";
+import { CartViewportPortal } from "@/components/pixel-cart-drawer";
 import { get, post } from "@/lib/api";
 import { lockBodyScroll } from "@/lib/body-scroll-lock";
 import { filterValidItems } from "@/lib/items";
-import { paginateCountItemsForPrint } from "@/lib/stock-count-paper";
+import { getPreviewCanvasHeight, paginateCountItemsForPrint } from "@/lib/stock-count-paper";
 import type { Category, Item, Location, SessionUser, StockCount, StoreItem } from "@/lib/types";
 
 const A4_PREVIEW_WIDTH_PX = 794;
@@ -115,6 +116,24 @@ export default function PaperCountPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPreviewOpen]);
 
+  useEffect(() => {
+    let originalTitle = "";
+    const onBeforePrint = () => {
+      originalTitle = document.title;
+      document.title = "";
+    };
+    const onAfterPrint = () => {
+      document.title = originalTitle;
+    };
+    window.addEventListener("beforeprint", onBeforePrint);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      window.removeEventListener("beforeprint", onBeforePrint);
+      window.removeEventListener("afterprint", onAfterPrint);
+      if (originalTitle) document.title = originalTitle;
+    };
+  }, []);
+
   const renderPanel = () => (
     <PreviewPanel
       created={created}
@@ -132,18 +151,29 @@ export default function PaperCountPage() {
     />
   );
 
-  return <div className="min-w-0 overflow-x-clip">
-    {printFrameSrc && (
-      <iframe
-        key={printFrameSrc}
-        title="print stock count document"
-        src={printFrameSrc}
-        className="no-print pointer-events-none fixed left-0 top-0 h-0 w-0 border-0 opacity-0"
-        aria-hidden="true"
-        tabIndex={-1}
-      />
+  return <>
+    {created && (
+      <div className="paper-browser-print-document" aria-hidden="true">
+        <StockCountPrintableDocument
+          count={created}
+          pages={pages}
+          className="stock-count-print-document stock-count-pdf-print-document"
+          officialCopy
+        />
+      </div>
     )}
-    <div className="screen-only">
+    <div className="min-w-0 overflow-x-clip">
+      {printFrameSrc && (
+        <iframe
+          key={printFrameSrc}
+          title="print stock count document"
+          src={printFrameSrc}
+          className="no-print pointer-events-none fixed left-0 top-0 h-0 w-0 border-0 opacity-0"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+      )}
+      <div className="screen-only">
       <PageHeader eyebrow="Stock Count · Paper OCR" title="พิมพ์ใบนับสต๊อก" description="สร้างเอกสาร A4 สำหรับเดินนับสินค้า แล้วนำกลับมาสแกน OCR" actions={<Link className="game-button game-button--secondary game-button--md" href="/inventory/count/scan">ไปหน้าสแกน</Link>} />
       <nav className="mb-5 flex flex-wrap gap-2">
         <Link className="game-button game-button--secondary game-button--md" href="/inventory/count">นับในระบบ</Link>
@@ -209,9 +239,14 @@ export default function PaperCountPage() {
         </div>
       </div>}
 
-      {isPreviewOpen && created && <PreviewModal count={created} pages={pages} onClose={() => setIsPreviewOpen(false)} onPrint={printDocument} />}
+      {isPreviewOpen && created && (
+        <CartViewportPortal>
+          <PreviewModal count={created} pages={pages} onClose={() => setIsPreviewOpen(false)} onPrint={printDocument} />
+        </CartViewportPortal>
+      )}
+      </div>
     </div>
-  </div>;
+  </>;
 }
 
 function PreviewPanel({
@@ -311,6 +346,7 @@ function PreviewModal({ count, pages, onClose, onPrint }: { count: StockCount; p
   const fitWidthScale = viewport.width ? Math.min(Math.max((viewport.width - 64) / A4_PREVIEW_WIDTH_PX, 0.5), 1.5) : 0.8;
   const fitPageScale = viewport.width && viewport.height ? Math.min(Math.max((viewport.width - 64) / A4_PREVIEW_WIDTH_PX, 0.5), Math.max((viewport.height - 64) / A4_PREVIEW_HEIGHT_PX, 0.5), 1.5) : 0.7;
   const scale = zoomMode === "FIT_WIDTH" ? fitWidthScale : zoomMode === "FIT_PAGE" ? fitPageScale : customScale;
+  const previewCanvasHeight = getPreviewCanvasHeight(Math.max(pages.length, 1));
   const setActualSize = () => {
     setZoomMode("CUSTOM");
     setCustomScale(1);
@@ -345,7 +381,7 @@ function PreviewModal({ count, pages, onClose, onPrint }: { count: StockCount; p
         <div
           className="preview-canvas document-preview-stage"
           style={{
-            minHeight: A4_PREVIEW_HEIGHT_PX * Math.max(pages.length, 1) * scale + 96,
+            minHeight: previewCanvasHeight,
             display: "flex",
             justifyContent: "center",
             alignItems: "flex-start",

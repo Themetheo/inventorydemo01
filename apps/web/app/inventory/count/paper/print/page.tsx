@@ -26,6 +26,14 @@ function PaperCountPrintContent() {
   const pages = count.data?.items ? paginateCountItemsForPrint(count.data.items) : [];
 
   useEffect(() => {
+    const originalTitle = document.title;
+    document.title = "";
+    return () => {
+      document.title = originalTitle;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!count.data?.items?.length) return;
     let cancelled = false;
     const printWhenReady = async () => {
@@ -47,7 +55,12 @@ function PaperCountPrintContent() {
   if (!count.data?.items?.length) return <PrintState text="เอกสารนี้ไม่มีรายการสินค้า" />;
 
   return <main className="print-only-document bg-white">
-    <StockCountPrintableDocument count={count.data} pages={pages} className="stock-count-print-document" />
+    <StockCountPrintableDocument
+      count={count.data}
+      pages={pages}
+      className="stock-count-print-document stock-count-pdf-print-document"
+      officialCopy
+    />
   </main>;
 }
 

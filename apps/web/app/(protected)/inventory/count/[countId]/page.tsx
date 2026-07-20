@@ -30,7 +30,7 @@ export default function CountDetailPage() {
   const summary = countReviewSummary(items);
 
   return <div className="min-w-0 overflow-x-clip">
-    <PageHeader eyebrow="Stock Count Detail" title={count.documentCode || count.countId} description={`${count.branch?.branchName ?? count.branchId} · ${count.location?.locationName ?? count.locationId} · ${count.countRound}`} actions={<div className="flex flex-wrap gap-2"><Link className="game-button game-button--secondary game-button--md" href="/inventory/count">ประวัติการนับ</Link>{count.source === "PAPER_OCR" && <Link className="game-button game-button--secondary game-button--md" href="/inventory/count/scan">รีวิว OCR</Link>}</div>} />
+    <PageHeader eyebrow="Stock Count Detail" title={count.documentCode || count.countId} description={`${count.branch?.branchName ?? count.branchId} · ${count.location?.locationName ?? count.locationId} · ${count.countRound}`} actions={<div className="flex flex-wrap gap-2"><Link className="game-button game-button--secondary game-button--md" href="/inventory/count">ประวัติการนับ</Link>{count.countStatus !== "COMPLETED" && <Link className="game-button game-button--secondary game-button--md" href={`/inventory/count/scan?countId=${count.countId}`}>รีวิว OCR</Link>}</div>} />
     {complete.error && <div className="mb-5"><ErrorBox error={complete.error} /></div>}
 
     <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">

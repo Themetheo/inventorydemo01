@@ -1692,6 +1692,53 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
   background: rgba(255, 255, 255, .88);
 }
 
+.stock-count-print-document .stock-count-final-compact .count-table th,
+.stock-count-print-document .stock-count-final-compact .count-table td {
+  padding: 1.25mm 1.25mm;
+}
+
+.stock-count-print-document .stock-count-final-compact .count-table td {
+  height: 8.4mm;
+}
+
+.stock-count-print-document .stock-count-final-compact .count-table th {
+  font-size: 8.8px;
+}
+
+.stock-count-print-document .stock-count-final-compact .count-table .code-cell {
+  font-size: 6.8px;
+}
+
+.stock-count-print-document .stock-count-final-compact .count-table .name-cell,
+.stock-count-print-document .stock-count-final-compact .count-table .document-table__item-name {
+  font-size: 10.2px;
+  line-height: 1.18;
+}
+
+.stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .document-footer {
+  padding: 2.2mm 2.6mm;
+}
+
+.stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .document-footer__blank {
+  min-height: 8mm;
+  background-size: 100% 5mm;
+}
+
+.stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .signature-section {
+  gap: 5mm !important;
+  margin-top: 4mm !important;
+}
+
+.stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .signature-box {
+  min-height: 18mm;
+  padding-top: 4.5mm;
+}
+
+.stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .signature-date {
+  margin-top: 1.4mm;
+  font-size: 8.2px;
+}
+
 .stock-count-print-document .signature-section {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
@@ -2406,6 +2453,53 @@ input[type="radio"] { width: 18px; height: 18px; accent-color: var(--color-game-
     font-size: 12px !important;
     font-weight: 800 !important;
     text-align: center !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact .count-table th,
+  .stock-count-print-document .stock-count-final-compact .count-table td {
+    padding: 1.25mm 1.25mm !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact .count-table td {
+    height: 8.4mm !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact .count-table th {
+    font-size: 8.8px !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact .count-table .code-cell {
+    font-size: 6.8px !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact .count-table .name-cell,
+  .stock-count-print-document .stock-count-final-compact .count-table .document-table__item-name {
+    font-size: 10.2px !important;
+    line-height: 1.18 !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .document-footer {
+    padding: 2.2mm 2.6mm !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .document-footer__blank {
+    min-height: 8mm !important;
+    background-size: 100% 5mm !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .signature-section {
+    gap: 5mm !important;
+    margin-top: 4mm !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .signature-box {
+    min-height: 18mm !important;
+    padding-top: 4.5mm !important;
+  }
+
+  .stock-count-print-document .stock-count-final-compact + .stock-count-final-bottom .signature-date {
+    margin-top: 1.4mm !important;
+    font-size: 8.2px !important;
   }
 
   .stock-count-print-document .stock-count-watermark {

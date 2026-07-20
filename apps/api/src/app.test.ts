@@ -133,6 +133,18 @@ describe("inventory API", () => {
     expect(response.json().data.items[0].ocrConfidence).toBeGreaterThan(0);
     expect(response.json().data.items[0].countedQty).not.toBe(5);
   });
+  it("previews OCR provider output without saving count rows", async () => {
+    const created = await app.inject({ method: "POST", url: "/api/v1/stock-counts/paper", headers: { cookie: roleCookies.stock }, payload: { locationId: "L2", countRound: "CLOSING", requireDailyCountOnly: true, itemIds: ["I1"] } });
+    const countId = created.json().data.countId;
+    const beforeCount = repository.data.Stock_Counts.find((row) => row.Count_ID === countId);
+    const beforeItem = repository.data.Stock_Count_Items.find((row) => row.Count_ID === countId);
+    const response = await app.inject({ method: "POST", url: `/api/v1/stock-counts/${countId}/ocr-preview`, headers: { cookie: roleCookies.stock }, payload: { files: [{ fileName: "scan.jpg", mimeType: "image/jpeg", size: 1234, pageNumber: 1, fingerprint: "preview:1234" }] } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toMatchObject({ provider: "mock", expectedRowCount: 1, previewRows: [{ rowNumber: 1, itemId: "I1" }] });
+    expect(response.json().data.rawContent).toContain("\"rows\"");
+    expect(repository.data.Stock_Counts.find((row) => row.Count_ID === countId)).toEqual(beforeCount);
+    expect(repository.data.Stock_Count_Items.find((row) => row.Count_ID === countId)).toEqual(beforeItem);
+  });
   it("rejects duplicate upload files and negative reviewed quantities", async () => {
     const created = await app.inject({ method: "POST", url: "/api/v1/stock-counts/paper", headers: { cookie: roleCookies.stock }, payload: { locationId: "L2", countRound: "CLOSING", itemIds: ["I1"] } });
     const countId = created.json().data.countId;

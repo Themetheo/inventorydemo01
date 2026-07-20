@@ -35,6 +35,7 @@ export function StockCountPrintableDocument({
       <div className="document-sheet mx-auto bg-white">
         {pages.map((pageItems, pageIndex) => {
           const isFinalPage = pageIndex === pages.length - 1;
+          const useFinalCompactLayout = officialCopy && isFinalPage && pageItems.length > finalMinRows;
           return (
           <DocumentPaper key={pageIndex} className={`print-page ${isFinalPage ? "document-paper--final-page" : "document-paper--page-break"}`}>
             <div className="stock-count-watermark" aria-hidden="true">ร้านข้าวหมูแดงเรือเมล์</div>
@@ -48,12 +49,12 @@ export function StockCountPrintableDocument({
                 { label: "หน้า", value: officialCopy ? `${pageIndex + 1} / ${pages.length}` : `${pageIndex + 1}/${pages.length}` },
               ]}
             />
-            <div className="document-content">
+            <div className={`document-content ${useFinalCompactLayout ? "stock-count-final-compact" : ""}`}>
               <StockCountDocumentTable
                 items={pageItems}
-                minRows={isFinalPage ? finalMinRows : normalMinRows}
+                minRows={isFinalPage ? (useFinalCompactLayout ? pageItems.length : finalMinRows) : normalMinRows}
                 normalizeUnits={officialCopy}
-                showEndRow={officialCopy && isFinalPage}
+                showEndRow={officialCopy && isFinalPage && (!useFinalCompactLayout || pageItems.length < normalMinRows)}
               />
             </div>
             {isFinalPage ? (

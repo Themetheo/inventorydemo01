@@ -7,6 +7,9 @@
 - `apps/api`: Fastify, JWT ใน httpOnly cookie, Zod และ Google Sheets API
 - Backend flow: Route → `InventoryService` → `InventoryRepository` →
   `GoogleSheetsInventoryRepository`
+- Paper count OCR flows through `InventoryService` to `CountOcrProvider`; runtime
+  OCR requires `TYPHOON_API_KEY` or `TYPHOON_OCR_API_KEY` and calls the Typhoon
+  chat-completions endpoint. The mock provider is limited to `NODE_ENV=test`.
 - `Stock_Movements` เป็น source of truth และ `Stock_Balances` เป็น projection
 - master data ถูก cache ใน memory 45 วินาทีและ invalidate หลังเขียน
 
@@ -43,7 +46,13 @@ GOOGLE_PRIVATE_KEY=
 JWT_SECRET=
 COOKIE_NAME=restaurant_session
 NODE_ENV=development
+TYPHOON_API_KEY=
+TYPHOON_BASE_URL=https://api.opentyphoon.ai/v1
+TYPHOON_MODEL=typhoon-ocr-preview
 ```
+
+Legacy typo aliases are also accepted for local `.env` compatibility:
+`TYPOON_API_KEY`, `TYPOON_BASE_URL`, `TYPOON_MODEL`, and `api_keytyphoon`.
 
 สำหรับ local development สามารถใช้
 `GOOGLE_SERVICE_ACCOUNT_KEY_FILE=../../key.json` แทน email/private key ได้ ไฟล์ key

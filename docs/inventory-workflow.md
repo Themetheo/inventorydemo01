@@ -175,15 +175,23 @@ Variance = ยอดที่นับได้จริง - ยอดในร
 เอกสารพิมพ์มี row number, item ID, item name, unit, ช่องเขียนจำนวน และ note แต่ไม่พิมพ์
 `systemQty` เพื่อไม่ให้ผู้ตรวจนับลำเอียงและไม่ให้ OCR สับสน
 
-หน้า `/inventory/count/scan` รับ JPG, JPEG, PNG, WebP และ PDF ขนาดไม่เกิน 12 MB ต่อไฟล์
+หน้า `/inventory/count/scan` รับ JPG, JPEG, PNG, WebP และ PDF ขนาดไม่เกิน 25 MB ต่อไฟล์
 พร้อม preview และ duplicate-file guard ใน browser จากนั้นเรียก backend OCR endpoint
 
-OCR phase ปัจจุบันเป็น mock adapter ใน `InventoryService.processCountOcr` เพื่อยืนยัน architecture:
+OCR phase now sends uploaded file content from `/inventory/count/scan` to the
+backend OCR endpoint. `InventoryService.processCountOcr` delegates to
+`apps/api/src/services/count-ocr-provider.ts`; runtime OCR requires
+`TYPHOON_API_KEY`/`TYPHOON_OCR_API_KEY` and always uses Typhoon. The mock
+provider is limited to `NODE_ENV=test`.
+
+Multi-page PDF OCR depends on the provider being able to see every page in the
+single uploaded PDF. The current app does not rasterize PDF pages before OCR, so
+uploading one image file per page is the reliable multi-page path.
 
 ```text
-Uploaded document metadata
+Uploaded document metadata + base64 content
       ↓
-Backend OCR adapter
+Backend OCR provider (Typhoon in runtime; mock only in tests)
       ↓
 Stock_Count_Items rowNumber + OCR_Raw_Value + OCR_Confidence + Review_Status
       ↓

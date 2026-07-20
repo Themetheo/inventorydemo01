@@ -13,9 +13,11 @@ const stockRoles: Role[] = ["owner", "manager", "stock"];
 const ok = <T>(data: T) => ({ ok: true as const, data });
 const paramsWith = (key: string) => z.object({ [key]: z.string().min(1) });
 const boolean = z.boolean();
+const STOCK_COUNT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+const STOCK_COUNT_UPLOAD_BASE64_MAX_CHARS = Math.ceil((STOCK_COUNT_UPLOAD_MAX_BYTES * 4) / 3);
 
 export async function buildApp(repository: InventoryRepository): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, bodyLimit: 96 * 1024 * 1024 });
   const service = new InventoryService(repository);
   const origins = (process.env.FRONTEND_ORIGIN ?? "http://localhost:3000").split(",").map((v) => v.trim()).filter(Boolean);
   await app.register(cors, { credentials: true, origin: (origin, callback) => callback(null, isAllowedOrigin(origin, origins)) });
@@ -85,6 +87,7 @@ export async function buildApp(repository: InventoryRepository): Promise<Fastify
   app.get(`${prefix}/stock-counts/:countId`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; return ok(await service.countDetail(request.user, countId)); });
   app.get(`${prefix}/stock-counts/:countId/print`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; return ok(await service.countDetail(request.user, countId)); });
   app.post(`${prefix}/stock-counts/:countId/uploads`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; const body = uploadSchema.parse(request.body); return ok(await service.processCountOcr(request.user, countId, body.files)); });
+  app.post(`${prefix}/stock-counts/:countId/ocr-preview`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; const body = uploadSchema.parse(request.body); return ok(await service.previewCountOcr(request.user, countId, body.files)); });
   app.post(`${prefix}/stock-counts/:countId/ocr`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; const body = uploadSchema.parse(request.body); return ok(await service.processCountOcr(request.user, countId, body.files)); });
   app.get(`${prefix}/stock-counts/:countId/ocr-result`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; return ok(await service.countDetail(request.user, countId)); });
   app.patch(`${prefix}/stock-counts/:countId/items`, stock, async (request) => { const { countId } = paramsWith("countId").parse(request.params) as { countId: string }; const body = countItemsPatchSchema.parse(request.body); return ok(await service.updateCountItems(request.user, countId, body.items, body.saveAsDraft)); });
@@ -114,9 +117,10 @@ const uploadSchema = z.object({
   files: z.array(z.object({
     fileName: z.string().trim().min(1).max(160),
     mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
-    size: z.number().int().positive().max(12 * 1024 * 1024),
+    size: z.number().int().positive().max(STOCK_COUNT_UPLOAD_MAX_BYTES),
     pageNumber: z.number().int().positive(),
     fingerprint: z.string().trim().max(240).optional(),
+    contentBase64: z.string().trim().max(STOCK_COUNT_UPLOAD_BASE64_MAX_CHARS).optional(),
   })).min(1),
 });
 const countItemsPatchSchema = z.object({

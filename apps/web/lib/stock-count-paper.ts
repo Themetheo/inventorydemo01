@@ -3,7 +3,7 @@ import type { StockCount, StockCountItem } from "./types";
 export const PAPER_ROWS_PER_PAGE = 14;
 export const PAPER_ROWS_PER_FINAL_PAGE = 10;
 export const STOCK_COUNT_UPLOAD_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
-export const STOCK_COUNT_UPLOAD_MAX_BYTES = 12 * 1024 * 1024;
+export const STOCK_COUNT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 export const PREVIEW_PAGE_HEIGHT_PX = 1123;
 export const PREVIEW_CANVAS_PADDING_PX = 96;
 
@@ -25,22 +25,13 @@ export function paginateCountItemsForPrint(items: StockCountItem[], rowsPerNorma
 
   const pages: StockCountItem[][] = [];
   let index = 0;
-  let remainingCount = items.length;
 
-  while (remainingCount > rowsPerNormalPage) {
+  while (items.length - index > rowsPerNormalPage) {
     pages.push(items.slice(index, index + rowsPerNormalPage));
     index += rowsPerNormalPage;
-    remainingCount -= rowsPerNormalPage;
   }
 
-  if (remainingCount <= rowsPerFinalPage) {
-    pages.push(items.slice(index));
-    return pages;
-  }
-
-  const firstTailCount = Math.ceil(remainingCount / 2);
-  pages.push(items.slice(index, index + firstTailCount));
-  pages.push(items.slice(index + firstTailCount));
+  pages.push(items.slice(index));
   return pages;
 }
 
@@ -70,6 +61,6 @@ export function validateStockCountUpload(file: Pick<File, "name" | "type" | "siz
   const fingerprint = `${file.name}:${file.size}`;
   if (existingFingerprints.has(fingerprint)) return { ok: false as const, code: "DUPLICATE_UPLOAD", message: "ไฟล์นี้ถูกเลือกแล้ว" };
   if (!STOCK_COUNT_UPLOAD_MIME_TYPES.includes(file.type as typeof STOCK_COUNT_UPLOAD_MIME_TYPES[number])) return { ok: false as const, code: "INVALID_TYPE", message: "รองรับเฉพาะ JPG, PNG, WebP หรือ PDF" };
-  if (file.size <= 0 || file.size > STOCK_COUNT_UPLOAD_MAX_BYTES) return { ok: false as const, code: "INVALID_SIZE", message: "ไฟล์ต้องมีขนาดไม่เกิน 12 MB" };
+  if (file.size <= 0 || file.size > STOCK_COUNT_UPLOAD_MAX_BYTES) return { ok: false as const, code: "INVALID_SIZE", message: "ไฟล์ต้องมีขนาดไม่เกิน 25 MB" };
   return { ok: true as const, fingerprint };
 }

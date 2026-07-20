@@ -27,11 +27,11 @@ describe("stock count paper helpers", () => {
     expect(pages[1][0].rowNumber).toBe(19);
   });
 
-  it("reserves final-page space for paper notes and signatures", () => {
+  it("fills normal pages before using the final signature page", () => {
     const rows = Array.from({ length: 25 }, (_, index) => item(index + 1, "UNREAD", null));
     const pages = paginateCountItemsForPrint(rows);
-    expect(pages.map((page) => page.length)).toEqual([14, 6, 5]);
-    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(21);
+    expect(pages.map((page) => page.length)).toEqual([14, 11]);
+    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(15);
   });
 
   it("uses the extra normal-page room before moving rows to the final signature page", () => {
@@ -44,8 +44,8 @@ describe("stock count paper helpers", () => {
   it("keeps long print documents on the same pagination as the web preview", () => {
     const rows = Array.from({ length: 70 }, (_, index) => item(index + 1, "UNREAD", null));
     const pages = paginateCountItemsForPrint(rows);
-    expect(pages.map((page) => page.length)).toEqual([14, 14, 14, 14, 7, 7]);
-    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(64);
+    expect(pages.map((page) => page.length)).toEqual([14, 14, 14, 14, 14]);
+    expect(pages.at(-1)?.at(0)?.rowNumber).toBe(57);
   });
 
   it("formats short Thai Buddhist dates for printed forms", () => {

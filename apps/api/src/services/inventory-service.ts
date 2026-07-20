@@ -4,10 +4,12 @@ import type { InventoryRepository } from "../repositories/inventory-repository.j
 import { balanceRecord, countItemRecord, countRecord, itemRecord, locationRecord, mapBalance, mapBranch, mapCategory, mapCount, mapCountItem, mapItem, mapLocation, mapMovement, mapRequest, mapRequestItem, mapStoreItem, mapUser, movementRecord, requestItemRecord, requestRecord, storeItemRecord } from "../utils/mappers.js";
 import { balanceId, createId } from "../utils/ids.js";
 import { applyMovementToBalances, countVariance, requestStatus, validateMovement, verifyUserPassword } from "./rules.js";
+import { createCountOcrProvider, parseOcrQuantity, type CountOcrDebugResult, type CountOcrProvider, type UploadedDocument } from "./count-ocr-provider.js";
 
 const now = () => new Date().toISOString();
 const today = () => now().slice(0, 10);
 const OCR_REVIEW_THRESHOLD = 0.8;
+const STOCK_COUNT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 
 type CountRound = "OPENING" | "MIDDAY" | "CLOSING" | "ADHOC";
 type PaperCountInput = {
@@ -19,11 +21,10 @@ type PaperCountInput = {
   sortBy?: "CATEGORY" | "LOCATION";
   note?: string;
 };
-type UploadedDocument = { fileName: string; mimeType: string; size: number; pageNumber: number; fingerprint?: string };
 type CountItemUpdate = { countItemId?: string; itemId?: string; rowNumber?: number; countedQty: number | null; note?: string; reviewStatus?: "UNREAD" | "OCR_RECOGNIZED" | "NEEDS_REVIEW" | "CONFIRMED" };
 
 export class InventoryService {
-  constructor(private readonly repository: InventoryRepository) {}
+  constructor(private readonly repository: InventoryRepository, private readonly ocrProvider: CountOcrProvider = createCountOcrProvider()) {}
 
   async login(username: string, password: string): Promise<SessionUser | null> {
     const user = await this.repository.findUserByUsername(username);
@@ -249,25 +250,61 @@ export class InventoryService {
     return this.countDetail(user, countId);
   }
 
+  async previewCountOcr(user: SessionUser, countId: string, files: UploadedDocument[]) {
+    const detail = await this.validateCountOcrRequest(user, countId, files);
+    const inspected = this.ocrProvider.inspect
+      ? await this.ocrProvider.inspect({ count: detail, items: detail.items, files })
+      : await this.inspectByRecognition(detail, files);
+    const recognizedByRow = new Map(inspected.normalized.rows.map((row) => [row.rowNumber, row]));
+    const previewRows = detail.items.map((item) => {
+      const row = recognizedByRow.get(item.rowNumber);
+      const rawValue = row?.rawValue.trim() ?? "";
+      const confidence = row?.confidence ?? 0;
+      const countedQty = parseOcrQuantity(rawValue);
+      return {
+        rowNumber: item.rowNumber,
+        itemId: item.itemId,
+        itemName: item.item?.itemName ?? "",
+        rawValue,
+        confidence,
+        countedQty,
+        reviewStatus: countedQty === null ? "UNREAD" as const : confidence < OCR_REVIEW_THRESHOLD ? "NEEDS_REVIEW" as const : "OCR_RECOGNIZED" as const,
+      };
+    });
+    return {
+      countId: detail.countId,
+      documentCode: detail.documentCode,
+      ocrStatus: detail.ocrStatus,
+      provider: inspected.provider,
+      endpoint: inspected.endpoint,
+      model: inspected.model,
+      files: inspected.files,
+      expectedRowCount: inspected.expectedRowCount,
+      rawResponse: inspected.rawResponse,
+      rawContent: inspected.rawContent,
+      parsedJson: inspected.parsedJson,
+      normalized: inspected.normalized,
+      previewRows,
+    };
+  }
+
   async processCountOcr(user: SessionUser, countId: string, files: UploadedDocument[]) {
-    if (!files.length) throw new AppError(400, "NO_UPLOAD_FILES", "กรุณาอัปโหลดไฟล์เอกสารอย่างน้อยหนึ่งไฟล์");
-    const detail = await this.countDetail(user, countId);
-    if (detail.countStatus === "COMPLETED") throw new AppError(409, "COUNT_ALREADY_COMPLETED", "รายการนี้ยืนยันผลนับแล้ว");
-    const fingerprints = new Set<string>();
-    for (const file of files) {
-      const mimeOk = ["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.mimeType);
-      if (!mimeOk || file.size <= 0 || file.size > 12 * 1024 * 1024) throw new AppError(400, "INVALID_UPLOAD_FILE", "รองรับ JPG, PNG, WebP หรือ PDF ขนาดไม่เกิน 12 MB");
-      const fingerprint = file.fingerprint || `${file.fileName}:${file.size}:${file.pageNumber}`;
-      if (fingerprints.has(fingerprint)) throw new AppError(409, "DUPLICATE_UPLOAD", "พบไฟล์ซ้ำในชุดอัปโหลดนี้");
-      fingerprints.add(fingerprint);
+    const detail = await this.validateCountOcrRequest(user, countId, files);
+    await this.repository.upsert("Stock_Counts", "Count_ID", [countRecord({ ...detail, ocrStatus: "PROCESSING", uploadedAt: now(), originalImageUrl: files.map((file) => sanitizeFileName(file.fileName)).join("; ") })]);
+    let result;
+    try {
+      result = await this.ocrProvider.recognize({ count: detail, items: detail.items, files });
+    } catch (error) {
+      await this.repository.upsert("Stock_Counts", "Count_ID", [countRecord({ ...detail, ocrStatus: "FAILED", uploadedAt: now(), originalImageUrl: files.map((file) => sanitizeFileName(file.fileName)).join("; ") })]);
+      throw error;
     }
+    const recognizedByRow = new Map(result.rows.map((row) => [row.rowNumber, row]));
     const processed = detail.items.map((item) => {
-      const unread = item.rowNumber % 5 === 0;
-      const lowConfidence = item.rowNumber % 3 === 0;
-      const rawValue = unread ? "" : String(item.rowNumber + (item.rowNumber % 2 ? 0.5 : 0));
-      const confidence = unread ? 0 : lowConfidence ? 0.58 : 0.92;
-      const countedQty = rawValue === "" ? null : Number(rawValue);
-      return { ...item, ocrRawValue: rawValue, ocrConfidence: confidence, countedQty, reviewedQty: null, reviewStatus: rawValue === "" ? "UNREAD" as const : confidence < OCR_REVIEW_THRESHOLD ? "NEEDS_REVIEW" as const : "OCR_RECOGNIZED" as const, varianceQty: countedQty === null ? 0 : countVariance(item.systemQty, countedQty) };
+      const row = recognizedByRow.get(item.rowNumber);
+      const rawValue = row?.rawValue.trim() ?? "";
+      const confidence = row?.confidence ?? 0;
+      const countedQty = parseOcrQuantity(rawValue);
+      return { ...item, ocrRawValue: rawValue, ocrConfidence: confidence, countedQty, reviewedQty: null, reviewStatus: countedQty === null ? "UNREAD" as const : confidence < OCR_REVIEW_THRESHOLD ? "NEEDS_REVIEW" as const : "OCR_RECOGNIZED" as const, varianceQty: countedQty === null ? 0 : countVariance(item.systemQty, countedQty) };
     });
     const average = processed.length ? processed.reduce((sum, item) => sum + item.ocrConfidence, 0) / processed.length : 0;
     const count: StockCount = { ...detail, ocrStatus: "REVIEW", uploadedAt: now(), originalImageUrl: files.map((file) => sanitizeFileName(file.fileName)).join("; "), ocrConfidence: Number(average.toFixed(3)) };
@@ -337,6 +374,39 @@ export class InventoryService {
       completer: countUsers.find((value) => value.userId === count.completedBy),
       items: countItems.map(mapCountItem).filter((item) => item.countId === count.countId).sort((a, b) => a.rowNumber - b.rowNumber).map((item) => ({ ...item, item: items.find((candidate) => candidate.itemId === item.itemId) })),
       movements: movements.map(mapMovement).filter((movement) => movement.referenceType === "COUNT" && movement.referenceId === count.countId),
+    };
+  }
+
+  private async validateCountOcrRequest(user: SessionUser, countId: string, files: UploadedDocument[]) {
+    if (!files.length) throw new AppError(400, "NO_UPLOAD_FILES", "กรุณาอัปโหลดไฟล์เอกสารอย่างน้อยหนึ่งไฟล์");
+    const detail = await this.countDetail(user, countId);
+    if (detail.countStatus === "COMPLETED") throw new AppError(409, "COUNT_ALREADY_COMPLETED", "รายการนี้ยืนยันผลนับแล้ว");
+    const fingerprints = new Set<string>();
+    for (const file of files) {
+      const mimeOk = ["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.mimeType);
+      if (!mimeOk || file.size <= 0 || file.size > STOCK_COUNT_UPLOAD_MAX_BYTES) throw new AppError(400, "INVALID_UPLOAD_FILE", "รองรับ JPG, PNG, WebP หรือ PDF ขนาดไม่เกิน 25 MB");
+      const fingerprint = file.fingerprint || `${file.fileName}:${file.size}:${file.pageNumber}`;
+      if (fingerprints.has(fingerprint)) throw new AppError(409, "DUPLICATE_UPLOAD", "พบไฟล์ซ้ำในชุดอัปโหลดนี้");
+      fingerprints.add(fingerprint);
+    }
+    return detail;
+  }
+
+  private async inspectByRecognition(detail: Awaited<ReturnType<InventoryService["countDetail"]>>, files: UploadedDocument[]): Promise<CountOcrDebugResult> {
+    const normalized = await this.ocrProvider.recognize({ count: detail, items: detail.items, files });
+    return {
+      provider: "mock" as const,
+      files: files.map((file) => ({
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        size: file.size,
+        pageNumber: file.pageNumber,
+        hasContent: Boolean(file.contentBase64?.trim()),
+      })),
+      expectedRowCount: detail.items.length,
+      rawContent: JSON.stringify(normalized),
+      parsedJson: normalized,
+      normalized,
     };
   }
 

@@ -1,9 +1,10 @@
 # Recent Changes
 
-Latest relevant changes at the 2026-07-08 context refresh. Keep this list to 10–15 entries and replace the oldest entries incrementally.
+Latest relevant changes at the 2026-07-15 context refresh. Keep this list to 10–15 entries and replace the oldest entries incrementally.
 
 | Commit | Date | Change | Primary context impact |
 | --- | --- | --- | --- |
+| Working tree | 2026-07-15 | Wire paper stock-count OCR to Typhoon API provider | Scan page sends base64 upload content; API accepts larger OCR payloads; `InventoryService.processCountOcr` uses `count-ocr-provider.ts`; runtime OCR requires Typhoon config while the mock provider is limited to tests |
 | Working tree | 2026-07-08 | Add paper stock-count print, scan, OCR review, and completion workflow | New `/inventory/count/paper`, `/inventory/count/scan`, `/inventory/count/[countId]` routes; new stock-count OCR APIs; expanded `Stock_Counts` and `Stock_Count_Items` columns; mock OCR provider remains |
 | Working tree | 2026-07-07 | Add internal-order document preview/print route and resolve Codespaces public URL access | New document preview components/route; public web access works on port `3001` after port `3000` tunnel returned `502`; API remains public on `4000` |
 | Working tree | 2026-07-07 | Add item image upload and automatic WebP compression for create/edit forms | Client resize/quality pipeline, compressed preview/metadata, Next upload route, local image storage, tests |
@@ -18,7 +19,6 @@ Latest relevant changes at the 2026-07-08 context refresh. Keep this list to 10�
 | `ee90fae` | 2026-07-02 | Add inventory request system | Initial end-to-end API/web inventory request MVP and architecture doc |
 | `b5b3f04` | 2026-07-02 | Proxy browser authentication through Next.js | Same-origin auth/API proxy behavior |
 | `5501df7` | 2026-07-02 | Configure Google Sheets authentication credentials | Sheets client configuration; never inspect or copy credential values |
-| `5122dd1` | 2026-07-02 | Complete local login setup and app configuration | Initial local authentication and app wiring |
 
 For detail, use targeted commands such as `git show --stat <commit> -- <feature-paths>` or `git diff <base>...HEAD -- <mapped-files>`; do not replay full repository history.
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StockCountPrintableDocument, roundLabel, stockCountRounds } from "@/components/documents/stock-count-printable-document";
@@ -23,6 +23,7 @@ type SelectablePaperItem = Item & {
 };
 
 export default function PaperCountPage() {
+  const client = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => get<SessionUser>("/auth/me") });
   const locations = useQuery({ queryKey: ["locations"], queryFn: () => get<Location[]>("/locations") });
   const categories = useQuery({ queryKey: ["categories"], queryFn: () => get<Category[]>("/categories") });
@@ -86,6 +87,8 @@ export default function PaperCountPage() {
     mutationFn: () => post<StockCount>("/stock-counts/paper", { locationId, countRound, categoryId: categoryId || undefined, requireDailyCountOnly, sortBy, itemIds: [...selected] }),
     onSuccess: async (value) => {
       const hydrated = value.items?.length ? value : await get<StockCount>(`/stock-counts/${value.countId}`);
+      client.setQueryData(["count-detail", hydrated.countId], hydrated);
+      await client.invalidateQueries({ queryKey: ["counts"] });
       setCreated(hydrated);
       setIsSummaryOpen(true);
     },
@@ -301,6 +304,7 @@ function PreviewPanel({
     {created && <div className="rounded-[7px] border border-[var(--color-game-border)] bg-[#fff0ce] p-3">
       <p className="text-xs font-black text-[var(--color-game-muted)]">สร้างใบนับแล้ว</p>
       <p className="mt-1 text-lg font-black text-[var(--color-game-brown)]">{created.documentCode || created.countId}</p>
+      <Link className="mt-2 mr-3 inline-block font-bold underline" href={`/inventory/count/scan?countId=${encodeURIComponent(created.countId)}`}>สแกนเอกสารนี้</Link>
       <p className="mt-1 text-sm font-bold text-[var(--color-game-muted)]">{created.items?.length ?? 0} รายการ</p>
       <Link className="mt-2 inline-block font-bold underline" href={`/inventory/count/${created.countId}`}>เปิดรายละเอียด</Link>
     </div>}
@@ -399,7 +403,7 @@ function PreviewModal({ count, pages, onClose, onPrint }: { count: StockCount; p
               overflow: "visible",
             }}
           >
-            <StockCountPrintableDocument count={count} pages={pages} className="stock-count-print-document stock-count-preview-document" />
+            <StockCountPrintableDocument count={count} pages={pages} className="stock-count-print-document stock-count-preview-document stock-count-pdf-print-document" officialCopy />
           </div>
         </div>
       </div>
